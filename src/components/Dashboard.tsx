@@ -3,7 +3,8 @@ import {
   Wallet, TrendingUp, Sparkles, Plus, AlertCircle, ArrowUpRight, ArrowDownLeft, 
   CheckCircle2, FileText, Activity, ShieldCheck, HeartPulse, Calendar, 
   Syringe, Scale, Video, UserCheck, Play, Wheat, Truck, FileCheck, ShoppingBag, 
-  Lock, ArrowRight, User, Award, Eye, Trash2, Mail, Phone, Info, Menu, X, LogOut
+  Lock, ArrowRight, User, Award, Eye, Trash2, Mail, Phone, Info, Menu, X, LogOut,
+  Copy, Check, Image, Upload, Clock, ChevronRight
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
@@ -31,6 +32,7 @@ interface DashboardProps {
   notifications?: AppNotification[];
   onMarkNotificationsRead?: () => void;
   invoices?: Invoice[];
+  onAddInvoice?: (newInvoice: Invoice) => void;
   onUpdateInvoice?: (id: string, updates: Partial<Invoice>) => void;
   orders?: Order[];
   onUpdateOrder?: (id: string, updates: Partial<Order>) => void;
@@ -52,6 +54,7 @@ export default function Dashboard({
   notifications,
   onMarkNotificationsRead,
   invoices = [],
+  onAddInvoice = () => {},
   onUpdateInvoice = () => {},
   orders = [],
   onUpdateOrder = () => {},
@@ -92,6 +95,15 @@ export default function Dashboard({
   // Wallet states
   const [fundAmount, setFundAmount] = useState<string>('50000');
   const [fundSuccess, setFundSuccess] = useState(false);
+  
+  // Manual Transfer states
+  const [transferBank, setTransferBank] = useState('GTBank');
+  const [transferRef, setTransferRef] = useState('');
+  const [transferReceiptName, setTransferReceiptName] = useState('');
+  const [transferReceiptPreview, setTransferReceiptPreview] = useState<string | null>(null);
+  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
+  const [transferSuccess, setTransferSuccess] = useState(false);
+
   const [withdrawAmount, setWithdrawAmount] = useState<string>('25000');
   const [bankName, setBankName] = useState('GTBank');
   const [accountNumber, setAccountNumber] = useState('0124589341');
@@ -181,18 +193,93 @@ export default function Dashboard({
   const handleFund = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(fundAmount);
-    if (amt > 0) {
-      onFundBalance(amt);
-      setFundSuccess(true);
+    if (amt > 0 && currentUser) {
+      setIsSubmittingTransfer(true);
+      
+      const newInvoiceId = `inv-${Date.now()}`;
+      const newInvoice: Invoice = {
+        id: newInvoiceId,
+        invoiceNumber: `INV-${Date.now()}`,
+        customerEmail: currentUser.email,
+        customerFullName: currentUser.fullName,
+        customerId: currentUser.id || currentUser.email,
+        amount: amt,
+        date: new Date().toISOString(),
+        status: 'Awaiting Verification',
+        paymentReference: transferRef || `TXN-${Date.now().toString().substring(5)}`,
+        bankUsed: transferBank,
+        receiptUrl: transferReceiptName || 'receipt_screenshot.png',
+        paymentDate: new Date().toISOString(),
+        internalNotes: 'Pending verification of bank transfer',
+        auditLog: [
+          {
+            date: new Date().toISOString(),
+            status: 'Awaiting Verification',
+            actionBy: currentUser.fullName,
+            notes: `Manual bank transfer proof submitted. Sender bank: ${transferBank}, Ref: ${transferRef || 'N/A'}`
+          }
+        ]
+      };
+      
+      onAddInvoice(newInvoice);
+      
       onDispatchNotification({
-        id: `notif-fund-${Date.now()}`,
+        id: `notif-transfer-${Date.now()}`,
         type: 'system',
-        title: '₦ Escrow Funded',
-        message: `Deposited ₦${amt.toLocaleString()} successfully to your secure digital wallet.`,
+        title: '₦ Transfer Proof Received',
+        message: `Manual transfer of ₦${amt.toLocaleString()} submitted for review. Ref: ${newInvoice.paymentReference}`,
         date: new Date().toISOString(),
         read: false
       });
-      setTimeout(() => setFundSuccess(false), 3000);
+
+      setIsSubmittingTransfer(false);
+      setTransferSuccess(true);
+      
+      // Clear form fields
+      setTransferRef('');
+      setTransferReceiptName('');
+      setTransferReceiptPreview(null);
+      
+      setTimeout(() => setTransferSuccess(false), 5000);
+    }
+  };
+
+  // Drag and Drop & File Upload handlers
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<Invoice | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setTransferReceiptName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setTransferReceiptPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setTransferReceiptName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setTransferReceiptPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -1161,26 +1248,192 @@ export default function Dashboard({
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     
-                    {/* Fund form */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
-                      <h3 className="font-bold text-md text-zinc-900 dark:text-white">Fund Escrow Wallet</h3>
-                      <form onSubmit={handleFund} className="space-y-4">
+                    {/* Manual Bank Transfer & Receipt Upload Form */}
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-5">
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-md text-zinc-900 dark:text-white flex items-center gap-1.5">
+                          <Wallet className="h-4 w-4 text-emerald-600" />
+                          Fund Escrow Wallet via Transfer
+                        </h3>
+                        <p className="text-[11px] text-zinc-400">
+                          Transfer funds to the secure escrow bank account below, then upload your receipt screenshot.
+                        </p>
+                      </div>
+
+                      {/* Bank Details Card */}
+                      <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-xl border border-zinc-150 dark:border-zinc-850 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Escrow Bank Details</span>
+                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/10">
+                            Instant Verification Pool
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-[10px] text-zinc-400 block font-normal">Bank Name</span>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200">Sterling Bank Plc</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-zinc-400 block font-normal">Account Name</span>
+                            <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate block" title="CowPlug Nigeria Ltd (Escrow Account)">
+                              CowPlug Ltd (Escrow Account)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t dark:border-zinc-850 flex items-center justify-between gap-2">
+                          <div>
+                            <span className="text-[10px] text-zinc-400 block font-normal">Account Number</span>
+                            <span className="font-mono font-bold text-sm text-zinc-900 dark:text-white tracking-wider">
+                              0092817261
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText('0092817261');
+                              alert('Sterling bank account number 0092817261 copied to clipboard!');
+                            }}
+                            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-850 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold"
+                          >
+                            <Copy className="h-3.5 w-3.5" /> Copy
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Manual Transfer details Form */}
+                      <form onSubmit={handleFund} className="space-y-4 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                              Amount Transferred (₦)
+                            </label>
+                            <input
+                              type="number"
+                              required
+                              min="1000"
+                              placeholder="e.g. 50000"
+                              value={fundAmount}
+                              onChange={(e) => setFundAmount(e.target.value)}
+                              className="w-full px-3.5 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                              Your Bank Name (Sender)
+                            </label>
+                            <select
+                              value={transferBank}
+                              onChange={(e) => setTransferBank(e.target.value)}
+                              className="w-full px-3.5 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 focus:outline-none focus:border-emerald-500"
+                            >
+                              <option value="GTBank">GTBank</option>
+                              <option value="Access Bank">Access Bank</option>
+                              <option value="Zenith Bank">Zenith Bank</option>
+                              <option value="Sterling Bank">Sterling Bank</option>
+                              <option value="UBA">UBA (United Bank for Africa)</option>
+                              <option value="Fidelity Bank">Fidelity Bank</option>
+                              <option value="First Bank">First Bank of Nigeria</option>
+                              <option value="Kuda Bank">Kuda Microfinance Bank</option>
+                              <option value="OPay">OPay</option>
+                              <option value="Palmpay">Palmpay</option>
+                            </select>
+                          </div>
+                        </div>
+
                         <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Deposit Amount (₦)</label>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
+                            Transaction Reference Number
+                          </label>
                           <input
-                            type="number"
+                            type="text"
                             required
-                            value={fundAmount}
-                            onChange={(e) => setFundAmount(e.target.value)}
-                            className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono"
+                            placeholder="e.g. 202607051234567890"
+                            value={transferRef}
+                            onChange={(e) => setTransferRef(e.target.value)}
+                            className="w-full px-3.5 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono focus:outline-none focus:border-emerald-500"
                           />
                         </div>
-                        <button type="submit" className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold">
-                          Fund secure Escrow
+
+                        {/* Interactive Receipt screenshot upload space */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase">
+                            Upload Receipt Screenshot
+                          </label>
+                          <div
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                            className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                              isDraggingFile 
+                                ? 'border-emerald-500 bg-emerald-50/20' 
+                                : transferReceiptPreview 
+                                ? 'border-emerald-500 bg-emerald-500/5' 
+                                : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700'
+                            }`}
+                            onClick={() => document.getElementById('receipt-upload-input')?.click()}
+                          >
+                            <input
+                              type="file"
+                              id="receipt-upload-input"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleFileChange}
+                            />
+                            
+                            {transferReceiptPreview ? (
+                              <div className="flex items-center gap-3 text-left">
+                                <div className="h-12 w-12 bg-zinc-100 rounded border overflow-hidden shrink-0 flex items-center justify-center">
+                                  <img 
+                                    src={transferReceiptPreview} 
+                                    alt="Receipt Preview" 
+                                    className="h-full w-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-zinc-800 dark:text-zinc-200 truncate text-[11px]">
+                                    {transferReceiptName || 'receipt_screenshot.png'}
+                                  </p>
+                                  <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5">
+                                    <Check className="h-3 w-3" /> Ready to upload
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTransferReceiptName('');
+                                    setTransferReceiptPreview(null);
+                                  }}
+                                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-850 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-1 text-zinc-400 dark:text-zinc-500">
+                                <Upload className="h-5 w-5 mx-auto text-zinc-400" />
+                                <p className="font-bold text-[10px]">
+                                  {isDraggingFile ? 'Drop file here' : 'Drag & drop payment receipt image, or browse'}
+                                </p>
+                                <p className="text-[9px]">Supports PNG, JPG, JPEG • Max 5MB</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <button 
+                          type="submit" 
+                          disabled={isSubmittingTransfer}
+                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          {isSubmittingTransfer ? 'Submitting Receipt...' : 'Submit Payment Proof'}
                         </button>
                       </form>
-                      {fundSuccess && (
-                        <p className="text-xs text-emerald-600 text-center font-bold">₦ Wallet updated successfully!</p>
+                      {transferSuccess && (
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 rounded-xl text-center text-xs font-bold animate-fade-in flex items-center justify-center gap-1">
+                          <CheckCircle2 className="h-4 w-4" /> Proof submitted successfully! Verification is pending.
+                        </div>
                       )}
                     </div>
 
@@ -1231,8 +1484,198 @@ export default function Dashboard({
                     </div>
                   </div>
                   
+                  {/* Escrow Funding & Manual Transfer History */}
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
+                    <div className="border-b dark:border-zinc-800 pb-3 flex justify-between items-center flex-wrap gap-2">
+                      <div>
+                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
+                          <Clock className="h-4 w-4 text-emerald-600" />
+                          Escrow Funding & Transfer History
+                        </h3>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Track your manual bank transfer uploads and receipt verification statuses.
+                        </p>
+                      </div>
+                      <span className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded font-mono text-zinc-500 dark:text-zinc-400 font-bold">
+                        Total Submissions: {invoices.filter(i => i.customerEmail.toLowerCase() === currentUser?.email.toLowerCase()).length}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800">
+                            <th className="p-3 pl-4">Invoice / Ref</th>
+                            <th className="p-3">Sender Bank</th>
+                            <th className="p-3">Amount</th>
+                            <th className="p-3">Date Submitted</th>
+                            <th className="p-3">Verification Status</th>
+                            <th className="p-3 text-right pr-4">Receipt Screenshot</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y dark:divide-zinc-800">
+                          {invoices.filter(i => i.customerEmail.toLowerCase() === currentUser?.email.toLowerCase()).length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="p-8 text-center text-zinc-400 dark:text-zinc-500 font-normal">
+                                <FileText className="h-6 w-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-1.5" />
+                                No transfer receipts uploaded yet. Use the transfer panel above to submit your receipt screenshot.
+                              </td>
+                            </tr>
+                          ) : (
+                            invoices
+                              .filter(i => i.customerEmail.toLowerCase() === currentUser?.email.toLowerCase())
+                              .map(inv => (
+                                <tr key={inv.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20 transition-colors">
+                                  <td className="p-3 pl-4 font-mono">
+                                    <div className="font-bold text-zinc-700 dark:text-zinc-300">
+                                      INV-{inv.id.replace('inv-', '').substring(0, 8).toUpperCase()}
+                                    </div>
+                                    <div className="text-[10px] text-zinc-400 truncate max-w-[120px]" title={inv.paymentReference}>
+                                      Ref: {inv.paymentReference || 'N/A'}
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                                      {inv.bankUsed || 'Sterling Bank'}
+                                    </span>
+                                  </td>
+                                  <td className="p-3 font-bold text-zinc-900 dark:text-white">
+                                    ₦{inv.amount.toLocaleString()}
+                                  </td>
+                                  <td className="p-3 text-zinc-500">
+                                    {new Date(inv.date).toLocaleDateString()}
+                                  </td>
+                                  <td className="p-3">
+                                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                      inv.status === 'Paid' || inv.status === 'Verified' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800' :
+                                      inv.status === 'Awaiting Verification' ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800 animate-pulse' :
+                                      inv.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800' :
+                                      'bg-zinc-50 text-zinc-500 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                                    }`}>
+                                      {inv.status === 'Paid' ? 'Verified & Funded' : inv.status}
+                                    </span>
+                                    {inv.internalNotes && inv.status === 'Rejected' && (
+                                      <span className="block text-[9px] text-red-500 font-medium mt-0.5">
+                                        Reason: {inv.internalNotes}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-right pr-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedHistoryInvoice(inv)}
+                                      className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                    >
+                                      <Image className="h-3.5 w-3.5" /> View Receipt
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   {/* Detailed Interactive Sourcing Invoices List with sorting & filtering */}
                   <PaymentsInvoiceHistory ownedAnimals={ownedAnimals} />
+
+                  {/* Receipt Lightbox Modal Overlay */}
+                  <AnimatePresence>
+                    {selectedHistoryInvoice && (
+                      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-xl relative space-y-4"
+                        >
+                          <button
+                            onClick={() => setSelectedHistoryInvoice(null)}
+                            className="absolute right-4 top-4 p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+
+                          <div className="space-y-1 pr-6 text-left">
+                            <h4 className="font-bold text-sm text-zinc-900 dark:text-white">
+                              Bank Transfer Receipt Screenshot
+                            </h4>
+                            <p className="text-[10px] font-mono text-zinc-400">
+                              Invoice ID: INV-{selectedHistoryInvoice.id.replace('inv-', '').substring(0, 8).toUpperCase()}
+                            </p>
+                          </div>
+
+                          {/* Image Render */}
+                          <div className="border border-zinc-150 dark:border-zinc-800 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center aspect-video relative">
+                            {selectedHistoryInvoice.receiptUrl && selectedHistoryInvoice.receiptUrl.startsWith('data:image') ? (
+                              <img 
+                                src={selectedHistoryInvoice.receiptUrl} 
+                                alt="Uploaded Proof of Payment" 
+                                className="max-h-full max-w-full object-contain"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="p-6 text-center text-zinc-400 space-y-2">
+                                <Image className="h-8 w-8 mx-auto text-zinc-300 dark:text-zinc-700" />
+                                <div className="text-[11px] font-bold text-zinc-500">
+                                  {selectedHistoryInvoice.receiptUrl || 'receipt_screenshot.png'}
+                                </div>
+                                <div className="text-[9px] text-zinc-400 font-normal max-w-xs mx-auto">
+                                  Receipt verified successfully. In a live system, this displays the uploaded proof of payment screenshot or document.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Details list */}
+                          <div className="bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-xl border border-zinc-150 dark:border-zinc-800 text-xs space-y-2 text-left">
+                            <div className="flex justify-between">
+                              <span className="text-zinc-400">Amount Transferred:</span>
+                              <span className="font-bold text-zinc-900 dark:text-white font-mono">
+                                ₦{selectedHistoryInvoice.amount.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-zinc-400">Sender Bank Used:</span>
+                              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                                {selectedHistoryInvoice.bankUsed || 'Sterling Bank'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between flex-col sm:flex-row sm:gap-2">
+                              <span className="text-zinc-400">Transaction Ref:</span>
+                              <span className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 break-all text-right">
+                                {selectedHistoryInvoice.paymentReference || 'TXN-UNKNOWN'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-zinc-400">Submission Date:</span>
+                              <span className="text-zinc-600 dark:text-zinc-400 font-mono text-[11px]">
+                                {new Date(selectedHistoryInvoice.date).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-zinc-400">Current Status:</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                selectedHistoryInvoice.status === 'Paid' || selectedHistoryInvoice.status === 'Verified' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                                selectedHistoryInvoice.status === 'Awaiting Verification' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400' :
+                                'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                              }`}>
+                                {selectedHistoryInvoice.status === 'Paid' ? 'Verified & Funded' : selectedHistoryInvoice.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={() => setSelectedHistoryInvoice(null)}
+                            className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                          >
+                            Close Preview
+                          </button>
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
 

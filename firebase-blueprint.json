@@ -1,0 +1,173 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile containing roles, balances, and contact info",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string", "enum": ["investor", "farmer", "admin"] },
+        "phone": { "type": "string" },
+        "balance": { "type": "number" },
+        "investmentsCount": { "type": "number" },
+        "avatar": { "type": "string" }
+      },
+      "required": ["id", "email", "fullName", "role", "balance"]
+    },
+    "UserInvestment": {
+      "title": "UserInvestment",
+      "description": "Livestock investments made by an investor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "investmentId": { "type": "string" },
+        "investmentTitle": { "type": "string" },
+        "type": { "type": "string", "enum": ["Cow", "Goat", "Ram"] },
+        "slotsBought": { "type": "number" },
+        "amountInvested": { "type": "number" },
+        "expectedProfit": { "type": "number" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Completed", "Pending"] },
+        "progress": { "type": "number" },
+        "customerId": { "type": "string" }
+      },
+      "required": ["id", "investmentId", "investmentTitle", "type", "slotsBought", "amountInvested", "expectedProfit", "startDate", "endDate", "status"]
+    },
+    "FarmerLivestock": {
+      "title": "FarmerLivestock",
+      "description": "Cattle and livestock managed on the farm",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tagNumber": { "type": "string" },
+        "breed": { "type": "string" },
+        "category": { "type": "string", "enum": ["Cow", "Goat", "Ram"] },
+        "weightKg": { "type": "number" },
+        "ageMonths": { "type": "number" },
+        "healthStatus": { "type": "string" },
+        "photo": { "type": "string" },
+        "vaccinations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lastVetCheck": { "type": "string" },
+        "datePurchased": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "feedingPlan": { "type": "string" },
+        "ownersName": { "type": "string" },
+        "estimatedValue": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "tagNumber", "breed", "category", "weightKg", "ageMonths", "healthStatus"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "System or animal event notification for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["system", "vaccination", "feed", "drug", "payout", "sale"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "date": { "type": "string" },
+        "read": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "type", "title", "message", "date", "read"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Financial invoices for wallet fundings or withdrawals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerFullName": { "type": "string" },
+        "customerId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "status": { "type": "string" },
+        "paymentReference": { "type": "string" },
+        "receiptUrl": { "type": "string" },
+        "bankUsed": { "type": "string" },
+        "paymentDate": { "type": "string" },
+        "internalNotes": { "type": "string" }
+      },
+      "required": ["id", "invoiceNumber", "customerEmail", "customerFullName", "customerId", "amount", "date", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Livestock direct purchase orders managed by admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "animalType": { "type": "string" },
+        "breed": { "type": "string" },
+        "packageType": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "status": { "type": "string" },
+        "fulfillmentStep": { "type": "string" },
+        "bankPaidInto": { "type": "string" },
+        "uploadedReceipt": { "type": "string" },
+        "transactionReference": { "type": "string" },
+        "internalNotes": { "type": "string" }
+      },
+      "required": ["id", "orderNumber", "customerName", "customerEmail", "amount", "date", "status"]
+    },
+    "AdminNotification": {
+      "title": "AdminNotification",
+      "description": "Admin system logs and audit alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "category": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "date": { "type": "string" },
+        "read": { "type": "boolean" },
+        "severity": { "type": "string" }
+      },
+      "required": ["id", "category", "title", "message", "date", "read", "severity"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "CowPlugNG users profiles collection"
+    },
+    "/user_investments/{investmentId}": {
+      "schema": "UserInvestment",
+      "description": "CowPlugNG investments made by users"
+    },
+    "/farmer_livestock/{livestockId}": {
+      "schema": "FarmerLivestock",
+      "description": "CowPlugNG livestock records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "AppNotification",
+      "description": "CowPlugNG in-app notifications"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": "Invoice",
+      "description": "CowPlugNG financial transactions invoices"
+    },
+    "/admin_orders/{orderId}": {
+      "schema": "Order",
+      "description": "CowPlugNG livestock purchases and order records"
+    },
+    "/admin_notifications/{adminNotificationId}": {
+      "schema": "AdminNotification",
+      "description": "CowPlugNG operational notification logs"
+    }
+  }
+}

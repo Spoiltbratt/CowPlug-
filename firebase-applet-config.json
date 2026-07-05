@@ -1,9 +1,10 @@
 {
-  "projectId": "glass-syntax-g3bk6",
-  "appId": "1:185795070237:web:c2e576721f06ab83fb79f4",
-  "apiKey": "AIzaSyAirBnwB30dKB0RDFxwUceXW6W5KAw9b34",
-  "authDomain": "glass-syntax-g3bk6.firebaseapp.com",
-  "storageBucket": "glass-syntax-g3bk6.firebasestorage.app",
-  "messagingSenderId": "185795070237",
+  "projectId": "sanguine-state-mn50x",
+  "appId": "1:9794052662:web:cfd29cafddb239526dee97",
+  "apiKey": "AIzaSyA-KZA2HZxoN-O-aaImvQYnQa8IUEQv_cA",
+  "authDomain": "sanguine-state-mn50x.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-remixremixcowplu-2a29ad64-8da9-47e1-b6d8-6837bd7d32bc",
+  "storageBucket": "sanguine-state-mn50x.firebasestorage.app",
+  "messagingSenderId": "9794052662",
   "measurementId": ""
 }

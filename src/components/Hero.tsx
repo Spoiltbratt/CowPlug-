@@ -71,36 +71,8 @@ export default function Hero({
   return (
     <div className="relative bg-zinc-950 dark:bg-black text-white overflow-hidden">
       
-      {/* Experience Toggle (Binance-style) placed on the Homepage Background directly below the main navigation bar */}
-      <div className="pt-24 pb-2 px-4 flex justify-center relative z-20">
-        <div className="bg-zinc-900/80 backdrop-blur-md p-1 rounded-2xl flex items-center border border-zinc-800 shadow-xl w-full max-w-xs sm:max-w-sm">
-          <button
-            id="toggle-lite-mode"
-            onClick={() => setExperienceMode?.('lite')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-              experienceMode === 'lite'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <span>Lite Mode</span>
-          </button>
-          <button
-            id="toggle-pro-mode"
-            onClick={() => setExperienceMode?.('pro')}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-              experienceMode === 'pro'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <span>Pro Mode</span>
-          </button>
-        </div>
-      </div>
-
       {/* Real-time Ticker Bar on top of the homepage */}
-      <div className="bg-zinc-900/90 border-b border-zinc-800 py-4 overflow-hidden relative z-20 backdrop-blur-sm mt-4">
+      <div className="bg-zinc-900/90 border-b border-zinc-800 pt-24 pb-4 overflow-hidden relative z-20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 space-y-4">
           
           {/* Livestock Rates Ticker row */}

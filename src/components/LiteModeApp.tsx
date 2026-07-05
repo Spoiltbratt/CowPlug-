@@ -31,6 +31,7 @@ import { MarketplaceAnimal, User as UserType, FarmerLivestock, AppNotification }
 import { Invoice } from '../types_payments';
 import { MARKETPLACE_ANIMALS } from '../data';
 import AnimalOutlineIcon from './AnimalOutlineIcon';
+import { dbAddFarmerLivestock } from '../db/sync';
 
 interface LiteModeAppProps {
   currentUser: UserType | null;
@@ -44,8 +45,8 @@ interface LiteModeAppProps {
   notifications: AppNotification[];
   onMarkNotificationsRead: () => void;
   onOpenAuth: (role?: 'investor' | 'farmer') => void;
-  activeTab: 'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile';
-  setActiveTab: (tab: 'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile') => void;
+  activeTab: 'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile' | 'rates';
+  setActiveTab: (tab: 'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile' | 'rates') => void;
   experienceMode?: 'lite' | 'pro';
   setExperienceMode?: (mode: 'lite' | 'pro') => void;
   invoices: Invoice[];
@@ -120,6 +121,49 @@ export default function LiteModeApp({
   // Buying actions
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [purchasedAnimal, setPurchasedAnimal] = useState<MarketplaceAnimal | null>(null);
+
+  // Livestock and Feed Rates states for Lite/Android version
+  const [ratesTab, setRatesTab] = useState<'livestock' | 'feed'>('livestock');
+  const [ratesSearchQuery, setRatesSearchQuery] = useState('');
+  
+  const [livestockRates, setLivestockRates] = useState(() => {
+    const saved = localStorage.getItem('cp_market_livestock_rates');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'Red Sokoto Goat', price: '₦85,000', change: '+4.2%' },
+      { id: '2', name: 'White Fulani Bull', price: '₦450,000', change: '+2.8%' },
+      { id: '3', name: 'Balami Premium Ram', price: '₦175,000', change: '+6.1%' },
+      { id: '4', name: 'Sokoto Gudali Cow', price: '₦520,000', change: '+1.5%' },
+      { id: '5', name: 'West African Dwarf Goat', price: '₦68,000', change: '+3.9%' },
+    ];
+  });
+
+  const [feedRates, setFeedRates] = useState(() => {
+    const saved = localStorage.getItem('cp_market_feed_rates');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', name: 'Premium Grass Silage (per kg)', price: '₦1,200', change: '+1.8%' },
+      { id: '2', name: 'High-Protein Fattening Concentrate (per bag)', price: '₦24,500', change: '-0.5%' },
+      { id: '3', name: 'Organic Feed Hay Bale', price: '₦8,500', change: '+2.3%' },
+      { id: '4', name: 'Mineral Salt Lick Block (per block)', price: '₦4,800', change: '+0.0%' },
+      { id: '5', name: 'Vitamin-Fortified Wheat Bran (per bag)', price: '₦18,200', change: '+1.2%' },
+    ];
+  });
+
+  useEffect(() => {
+    const syncWithStorage = () => {
+      const savedLive = localStorage.getItem('cp_market_livestock_rates');
+      if (savedLive) setLivestockRates(JSON.parse(savedLive));
+      const savedFeed = localStorage.getItem('cp_market_feed_rates');
+      if (savedFeed) setFeedRates(JSON.parse(savedFeed));
+    };
+
+    window.addEventListener('storage', syncWithStorage);
+    const interval = setInterval(syncWithStorage, 2000);
+
+    return () => {
+      window.removeEventListener('storage', syncWithStorage);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Quick Preset login helper
   const handleQuickPresetLogin = (role: 'investor' | 'farmer' | 'admin') => {
@@ -196,6 +240,7 @@ export default function LiteModeApp({
     };
 
     setFarmerLivestock(prev => [newAnimal, ...prev]);
+    dbAddFarmerLivestock(newAnimal, currentUser.id);
     setPurchasedAnimal(animal);
     setPurchaseSuccess(true);
   };
@@ -275,38 +320,10 @@ export default function LiteModeApp({
 
       <div className="relative z-10 max-w-4xl mx-auto px-4 pt-8 pb-8 space-y-6">
         
-        {/* Experience Toggle (Binance-style) placed on the Homepage Background directly below the main navigation bar */}
-        {activeTab === 'home' && (
-          <div className="flex justify-center pt-2 pb-2 relative z-20">
-            <div className="bg-zinc-900/80 backdrop-blur-md p-1 rounded-2xl flex items-center border border-zinc-800 shadow-xl w-full max-w-xs sm:max-w-sm">
-              <button
-                id="toggle-lite-mode-from-lite"
-                onClick={() => setExperienceMode?.('lite')}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-                  experienceMode === 'lite'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <span>Lite Mode</span>
-              </button>
-              <button
-                id="toggle-pro-mode-from-lite"
-                onClick={() => setExperienceMode?.('pro')}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${
-                  experienceMode === 'pro'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <span>Pro Mode</span>
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {/* Navigation Tabs - LARGE & VERY CLEAR (Sleek dark backdrop for premium look, hidden on mobile in favor of premium bottom nav) */}
-        <div className="hidden md:grid md:grid-cols-7 gap-2 bg-zinc-900/70 border border-zinc-850/80 p-2 rounded-2xl backdrop-blur-md relative z-10">
+        <div className="hidden md:grid md:grid-cols-8 gap-2 bg-zinc-900/70 border border-zinc-850/80 p-2 rounded-2xl backdrop-blur-md relative z-10">
           {[
             { id: 'home', label: 'Home', icon: Home },
             { id: 'buy', label: 'Buy Livestock', icon: ShoppingBag },
@@ -314,6 +331,7 @@ export default function LiteModeApp({
             { id: 'find-animal', label: 'Find an Animal', icon: Plus },
             { id: 'payments', label: 'Payments', icon: DollarSign },
             { id: 'receive', label: 'Receive My Animal', icon: Truck },
+            { id: 'rates', label: 'Market Rates', icon: TrendingUp },
             { id: 'profile', label: 'Profile', icon: UserIcon },
           ].map(tab => {
             const Icon = tab.icon;
@@ -515,6 +533,21 @@ export default function LiteModeApp({
                       <h4 className="font-bold text-base text-zinc-900 dark:text-white">Animal Health & Progress</h4>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
                         Track daily feeding records, vaccinations, and veterinary safety status of your animals.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('rates')}
+                    className="flex items-start text-left p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-emerald-50/50 hover:bg-emerald-50 dark:bg-emerald-950/10 dark:hover:bg-emerald-950/20 transition-all group cursor-pointer col-span-1 md:col-span-2"
+                  >
+                    <div className="p-3 bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-xl mr-4 group-hover:scale-110 transition-transform">
+                      <TrendingUp className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-base text-zinc-900 dark:text-white">Live Market & Feed Rates</h4>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        View real-time trading statistics, live livestock valuations, and distributor feed mill price indexes.
                       </p>
                     </div>
                   </button>
@@ -1161,6 +1194,136 @@ export default function LiteModeApp({
                     </div>
                   ))}
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 8: MARKET RATES */}
+          {activeTab === 'rates' && (
+            <motion.div
+              key="rates-tab"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="space-y-6"
+            >
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-black text-zinc-900 dark:text-white flex items-center justify-center gap-2">
+                  <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                  Live Market Rates
+                </h2>
+                <p className="text-sm text-zinc-500">
+                  Real-time direct livestock trading statistics and feed rates index.
+                </p>
+              </div>
+
+              {/* Ticker synchronization indicator */}
+              <div className="flex justify-center">
+                <div className="inline-flex items-center space-x-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-full text-[10px] font-mono font-bold animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  <span>LIVE COOPERATIVE DATA STREAM</span>
+                </div>
+              </div>
+
+              {/* Controls and Search Bar */}
+              <div className="space-y-4">
+                <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-800">
+                  <button
+                    onClick={() => {
+                      setRatesTab('livestock');
+                      setRatesSearchQuery('');
+                    }}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      ratesTab === 'livestock'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    Livestock Rates
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRatesTab('feed');
+                      setRatesSearchQuery('');
+                    }}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      ratesTab === 'feed'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    Feed Rates
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={ratesSearchQuery}
+                    onChange={(e) => setRatesSearchQuery(e.target.value)}
+                    placeholder={ratesTab === 'livestock' ? 'Search livestock breeds (e.g. goat, cow)...' : 'Search feed types (e.g. silage, concentrate)...'}
+                    className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs text-zinc-800 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Rates list */}
+              <div className="space-y-3">
+                {ratesTab === 'livestock' ? (
+                  livestockRates
+                    .filter((rate: any) => rate.name.toLowerCase().includes(ratesSearchQuery.toLowerCase()))
+                    .map((rate: any) => {
+                      const isPositive = !rate.change.startsWith('-');
+                      return (
+                        <div 
+                          key={rate.id}
+                          className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-850 rounded-2xl flex items-center justify-between"
+                        >
+                          <div className="space-y-1 text-left">
+                            <p className="font-bold text-xs text-zinc-900 dark:text-white">{rate.name}</p>
+                            <p className="text-[10px] text-zinc-400">Cooperative Trade Sourced</p>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <p className="font-mono font-bold text-sm text-zinc-900 dark:text-white">{rate.price}</p>
+                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${
+                              isPositive 
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                            }`}>
+                              {rate.change}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  feedRates
+                    .filter((rate: any) => rate.name.toLowerCase().includes(ratesSearchQuery.toLowerCase()))
+                    .map((rate: any) => {
+                      const isPositive = !rate.change.startsWith('-');
+                      return (
+                        <div 
+                          key={rate.id}
+                          className="p-4 bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200 dark:border-zinc-850 rounded-2xl flex items-center justify-between"
+                        >
+                          <div className="space-y-1 text-left">
+                            <p className="font-bold text-xs text-zinc-900 dark:text-white">{rate.name}</p>
+                            <p className="text-[10px] text-zinc-400">Distributor Feed Mill Index</p>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <p className="font-mono font-bold text-sm text-zinc-900 dark:text-white">{rate.price}</p>
+                            <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${
+                              isPositive 
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                            }`}>
+                              {rate.change}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
               </div>
             </motion.div>
           )}

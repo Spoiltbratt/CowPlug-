@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, ShieldAlert, LogIn, X, Users, Briefcase, TrendingUp, Leaf, Zap, Home, ShoppingBag, Heart, DollarSign, User as UserIcon } from 'lucide-react';
 
@@ -13,6 +13,28 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import About from './components/About';
 import Marketplace from './components/Marketplace';
+
+// Firebase Integrations
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
+import { signInWithPopup } from 'firebase/auth';
+import { db, auth, googleProvider } from './firebase';
+import {
+  seedUserIfMissing,
+  dbUpdateUserProfile,
+  dbAddUserInvestment,
+  dbUpdateUserInvestment,
+  dbAddFarmerLivestock,
+  dbUpdateFarmerLivestock,
+  dbDeleteFarmerLivestock,
+  dbAddNotification,
+  dbMarkNotificationsRead,
+  dbAddInvoice,
+  dbUpdateInvoice,
+  dbAddAdminOrder,
+  dbUpdateAdminOrder,
+  dbAddAdminNotification,
+  dbUpdateAdminNotification,
+} from './db/sync';
 import MeatSupply from './components/MeatSupply';
 import Dashboard from './components/Dashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -181,14 +203,14 @@ export default function App() {
     return 'dashboard';
   });
 
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   
   const [experienceMode, setExperienceMode] = useState<'lite' | 'pro'>(() => {
     const saved = localStorage.getItem('cp_experience_mode');
     return (saved as 'lite' | 'pro') || 'lite';
   });
 
-  const [liteActiveTab, setLiteActiveTab] = useState<'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile'>(() => {
+  const [liteActiveTab, setLiteActiveTab] = useState<'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile' | 'rates'>(() => {
     const saved = localStorage.getItem('cp_lite_active_tab');
     return (saved as any) || 'home';
   });
@@ -410,6 +432,125 @@ export default function App() {
     }
   }, [currentUser, activeSection]);
 
+  // Firebase Real-time Subscriptions & Sync
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Listen to current user profile changes to sync balance and other attributes
+    const unsubUser = onSnapshot(doc(db, 'users', currentUser.id), (snapshot) => {
+      if (snapshot.exists()) {
+        const uData = snapshot.data() as User;
+        // Only update state if values differ to prevent loops
+        if (uData.fullName !== currentUser.fullName || uData.role !== currentUser.role || uData.phone !== currentUser.phone || uData.avatar !== currentUser.avatar) {
+          setCurrentUser(uData);
+        }
+        if (uData.balance !== userBalance) {
+          setUserBalance(uData.balance);
+        }
+      }
+    }, (error) => {
+      console.error('Error listening to user profile:', error);
+    });
+
+    // Listen to investments
+    const qInv = query(collection(db, 'user_investments'), where('customerId', '==', currentUser.id));
+    const unsubInv = onSnapshot(qInv, (snapshot) => {
+      const list: UserInvestment[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as UserInvestment);
+      });
+      setUserInvestments(list);
+    }, (error) => {
+      console.error('Error listening to investments:', error);
+    });
+
+    // Listen to livestock
+    const qLive = query(collection(db, 'farmer_livestock'), where('userId', '==', currentUser.id));
+    const unsubLive = onSnapshot(qLive, (snapshot) => {
+      const list: FarmerLivestock[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as FarmerLivestock);
+      });
+      setFarmerLivestock(list);
+    }, (error) => {
+      console.error('Error listening to livestock:', error);
+    });
+
+    // Listen to notifications
+    const qNotif = query(collection(db, 'notifications'), where('userId', '==', currentUser.id));
+    const unsubNotif = onSnapshot(qNotif, (snapshot) => {
+      const list: AppNotification[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as AppNotification);
+      });
+      setNotifications(list);
+    }, (error) => {
+      console.error('Error listening to notifications:', error);
+    });
+
+    // Listen to invoices
+    const qInvoices = currentUser.role === 'admin' 
+      ? collection(db, 'invoices')
+      : query(collection(db, 'invoices'), where('customerId', '==', currentUser.id));
+    const unsubInvoices = onSnapshot(qInvoices, (snapshot) => {
+      const list: Invoice[] = [];
+      snapshot.forEach((doc) => {
+        list.push(doc.data() as Invoice);
+      });
+      setInvoices(list);
+    }, (error) => {
+      console.error('Error listening to invoices:', error);
+    });
+
+    // Admin extra listeners
+    let unsubAdminOrders = () => {};
+    let unsubAdminNotif = () => {};
+    let unsubAllUsers = () => {};
+
+    if (currentUser.role === 'admin') {
+      unsubAdminOrders = onSnapshot(collection(db, 'admin_orders'), (snapshot) => {
+        const list: Order[] = [];
+        snapshot.forEach((doc) => {
+          list.push(doc.data() as Order);
+        });
+        setAdminOrders(list);
+      }, (error) => {
+        console.error('Error listening to admin orders:', error);
+      });
+
+      unsubAdminNotif = onSnapshot(collection(db, 'admin_notifications'), (snapshot) => {
+        const list: AdminNotification[] = [];
+        snapshot.forEach((doc) => {
+          list.push(doc.data() as AdminNotification);
+        });
+        setAdminNotifications(list);
+      }, (error) => {
+        console.error('Error listening to admin notifications:', error);
+      });
+
+      unsubAllUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        const list: User[] = [];
+        snapshot.forEach((doc) => {
+          list.push(doc.data() as User);
+        });
+        setUsersList(list);
+      }, (error) => {
+        console.error('Error listening to users:', error);
+      });
+    }
+
+    return () => {
+      unsubUser();
+      unsubInv();
+      unsubLive();
+      unsubNotif();
+      unsubInvoices();
+      unsubAdminOrders();
+      unsubAdminNotif();
+      unsubAllUsers();
+    };
+  }, [currentUser?.id, currentUser?.role]);
+
   // Ledger / Balance Storage
   const [userBalance, setUserBalance] = useState<number>(() => {
     const saved = localStorage.getItem('cp_balance');
@@ -450,10 +591,14 @@ export default function App() {
 
   const handleAddInvoice = (inv: Invoice) => {
     setInvoices(prev => [inv, ...prev]);
+    if (currentUser) {
+      dbAddInvoice(inv, currentUser.id);
+    }
   };
 
   const handleUpdateInvoice = (id: string, updates: Partial<Invoice>) => {
     setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, ...updates } : inv));
+    dbUpdateInvoice(id, updates);
   };
 
   // Persist States
@@ -494,36 +639,128 @@ export default function App() {
   // Quick Action handlers
   const handleFundBalance = (amt: number) => {
     setUserBalance((prev) => prev + amt);
+    if (currentUser) {
+      dbUpdateUserProfile(currentUser.id, { balance: userBalance + amt });
+    }
   };
 
   const handleWithdrawBalance = (amt: number) => {
     setUserBalance((prev) => Math.max(0, prev - amt));
+    if (currentUser) {
+      dbUpdateUserProfile(currentUser.id, { balance: Math.max(0, userBalance - amt) });
+    }
   };
 
   const handleDeductBalance = (amt: number) => {
     setUserBalance((prev) => Math.max(0, prev - amt));
+    if (currentUser) {
+      dbUpdateUserProfile(currentUser.id, { balance: Math.max(0, userBalance - amt) });
+    }
   };
 
   const handleAddUserInvestment = (newInv: UserInvestment) => {
     setUserInvestments((prev) => [newInv, ...prev]);
+    if (currentUser) {
+      dbAddUserInvestment(newInv, currentUser.id);
+      dbUpdateUserProfile(currentUser.id, { investmentsCount: (currentUser.investmentsCount || 0) + 1 });
+    }
   };
 
   const handleAddFarmerLivestock = (newLive: FarmerLivestock) => {
     setFarmerLivestock((prev) => [newLive, ...prev]);
+    if (currentUser) {
+      dbAddFarmerLivestock(newLive, currentUser.id);
+    }
   };
 
   const handleDispatchNotification = (newNotif: AppNotification) => {
     setNotifications((prev) => [newNotif, ...prev]);
+    if (currentUser) {
+      dbAddNotification(newNotif, currentUser.id);
+    }
   };
+
+  // Local Push Toast states and trigger logic for 'Attention Required' status updates
+  const prevLivestockRef = useRef<FarmerLivestock[]>([]);
+  const [localToasts, setLocalToasts] = useState<{ id: string; title: string; message: string; tagNumber: string }[]>([]);
+
+  const showLocalToast = (title: string, message: string, tagNumber: string) => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setLocalToasts((prev) => [...prev, { id, title, message, tagNumber }]);
+    setTimeout(() => {
+      setLocalToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 6000);
+  };
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  useEffect(() => {
+    // Only detect changes if we already had a previous state (prevents initial load notification spam)
+    if (prevLivestockRef.current && prevLivestockRef.current.length > 0) {
+      farmerLivestock.forEach((newAnimal) => {
+        const oldAnimal = prevLivestockRef.current.find((a) => a.id === newAnimal.id);
+        const isAttentionRequired = newAnimal.healthStatus && newAnimal.healthStatus.toLowerCase().includes('attention required');
+
+        if (isAttentionRequired) {
+          let shouldNotify = false;
+          if (!oldAnimal) {
+            shouldNotify = true;
+          } else if (oldAnimal.healthStatus && !oldAnimal.healthStatus.toLowerCase().includes('attention required')) {
+            shouldNotify = true;
+          }
+
+          if (shouldNotify) {
+            // 1. Browser Native Push Notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification(`⚠️ CowPlug Health Alert: #${newAnimal.tagNumber}`, {
+                  body: `Animal ${newAnimal.breed} is flagged as 'Attention Required'.`,
+                  icon: newAnimal.photo || 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&q=80&w=200',
+                });
+              } catch (e) {
+                console.warn('Native notification failed:', e);
+              }
+            }
+
+            // 2. In-App Slide-out Toast Notification
+            showLocalToast(
+              `⚠️ Health Alert: #${newAnimal.tagNumber}`,
+              `Animal ${newAnimal.breed} has been marked as 'Attention Required'. Please check veterinary reports.`,
+              newAnimal.tagNumber
+            );
+
+            // 3. Persistent app notification
+            handleDispatchNotification({
+              id: `notif-attention-${Date.now()}-${newAnimal.id}`,
+              type: 'system',
+              title: '⚠️ Health Alert: Attention Required',
+              message: `Animal tag #${newAnimal.tagNumber} (${newAnimal.breed}) status changed to 'Attention Required'. Veterinary review is recommended.`,
+              date: new Date().toISOString(),
+              read: false
+            });
+          }
+        }
+      });
+    }
+    prevLivestockRef.current = farmerLivestock;
+  }, [farmerLivestock]);
 
   const handleMarkNotificationsRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (currentUser) {
+      dbMarkNotificationsRead(currentUser.id, notifications.map((n) => n.id));
+    }
   };
 
   const handleUpdateUserBalance = (email: string, amt: number) => {
     setUsersList(prev => prev.map(u => {
       if (u.email.toLowerCase() === email.toLowerCase()) {
         const newBal = u.balance + amt;
+        dbUpdateUserProfile(u.id, { balance: newBal });
         return { ...u, balance: newBal };
       }
       return u;
@@ -538,6 +775,7 @@ export default function App() {
     setUsersList(prev => prev.map(u => {
       if (u.id === id) {
         const updated = { ...u, ...updates };
+        dbUpdateUserProfile(id, updates);
         if (currentUser && currentUser.id === id) {
           setCurrentUser(updated);
           if (updates.balance !== undefined) {
@@ -566,8 +804,9 @@ export default function App() {
     setCartItems([]);
   };
 
-  const handleQuickLogin = (role: 'investor' | 'farmer' | 'admin') => {
+  const handleQuickLogin = async (role: 'investor' | 'farmer' | 'admin') => {
     const preset = PRESET_USERS[role];
+    await seedUserIfMissing(preset, [], [], INITIAL_NOTIFICATIONS);
     setCurrentUser(preset);
     setUserBalance(preset.balance);
     setAuthModalOpen(false);
@@ -575,10 +814,11 @@ export default function App() {
     setDashboardTab(role === 'admin' ? 'overview' : 'dashboard');
   };
 
-  const handleCustomLogin = (email: string) => {
+  const handleCustomLogin = async (email: string) => {
     const trimmedEmail = email.trim().toLowerCase();
     const foundUser = usersList.find((u) => u.email.toLowerCase() === trimmedEmail);
     if (foundUser) {
+      await seedUserIfMissing(foundUser, [], [], INITIAL_NOTIFICATIONS);
       setCurrentUser(foundUser);
       setUserBalance(foundUser.balance);
       setAuthModalOpen(false);
@@ -589,7 +829,7 @@ export default function App() {
     return false;
   };
 
-  const handleCustomRegister = (fullName: string, email: string, phone: string) => {
+  const handleCustomRegister = async (fullName: string, email: string, phone: string) => {
     const trimmedEmail = email.trim().toLowerCase();
     const existing = usersList.find((u) => u.email.toLowerCase() === trimmedEmail);
     if (existing) {
@@ -610,12 +850,56 @@ export default function App() {
     };
 
     setUsersList((prev) => [...prev, newUser]);
+    await seedUserIfMissing(newUser, [], [], INITIAL_NOTIFICATIONS);
     setCurrentUser(newUser);
     setUserBalance(newUser.balance);
     setAuthModalOpen(false);
     setActiveSection('dashboard');
     setDashboardTab(newUser.role === 'admin' ? 'overview' : 'dashboard');
     return true;
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      if (user) {
+        // Formulate a clean User object
+        const userEmail = user.email || '';
+        const parts = userEmail.split('@');
+        const domain = parts[1] || '';
+        // Map roles based on domain or fallback to investor
+        let role: 'investor' | 'farmer' | 'admin' = 'investor';
+        if (domain === 'cowplug.ng') {
+          if (parts[0].includes('amina') || parts[0].includes('admin')) {
+            role = 'admin';
+          } else {
+            role = 'farmer';
+          }
+        }
+        
+        const loggedUser: User = {
+          id: user.uid,
+          email: userEmail,
+          fullName: user.displayName || 'CowPlug User',
+          role: role,
+          phone: user.phoneNumber || '+234 803 000 0000',
+          balance: role === 'investor' ? 1000000 : 0, // start with trial balance
+          investmentsCount: 0,
+          avatar: user.photoURL || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200'
+        };
+
+        await seedUserIfMissing(loggedUser, [], [], INITIAL_NOTIFICATIONS);
+        setCurrentUser(loggedUser);
+        setUserBalance(loggedUser.balance);
+        setAuthModalOpen(false);
+        setActiveSection('dashboard');
+        setDashboardTab(role === 'admin' ? 'overview' : 'dashboard');
+      }
+    } catch (error) {
+      console.error('Google Sign In failed:', error);
+      alert('Google Sign In failed. Please try again.');
+    }
   };
 
   const handlePurchaseLivestock = (
@@ -672,6 +956,13 @@ export default function App() {
     setAdminOrders(prev => [newOrder, ...prev]);
     setInvoices(prev => [newInvoice, ...prev]);
 
+    dbAddAdminOrder(newOrder);
+    if (currentUser) {
+      dbAddInvoice(newInvoice, currentUser.id);
+    } else {
+      dbAddInvoice(newInvoice, '101');
+    }
+
     handleDispatchNotification({
       id: `notif-purchase-pending-${Date.now()}`,
       type: 'system',
@@ -693,8 +984,8 @@ export default function App() {
         setActiveSection={setActiveSection}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
-        onOpenAuth={() => {
-          setAuthMode('login');
+        onOpenAuth={(mode) => {
+          setAuthMode(mode || 'login');
           setAuthModalOpen(true);
         }}
         notifications={notifications}
@@ -988,6 +1279,7 @@ export default function App() {
                   notifications={notifications}
                   onMarkNotificationsRead={handleMarkNotificationsRead}
                   invoices={invoices}
+                  onAddInvoice={handleAddInvoice}
                   onUpdateInvoice={handleUpdateInvoice}
                   orders={adminOrders}
                   onUpdateOrder={(id, updates) => {
@@ -1126,6 +1418,26 @@ export default function App() {
                       className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-md"
                     >
                       Sign In
+                    </button>
+
+                    <div className="relative flex py-1 items-center">
+                      <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                      <span className="flex-shrink mx-3 text-[10px] font-bold text-zinc-400 uppercase font-mono tracking-wider">or</span>
+                      <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      className="w-full py-3 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                      </svg>
+                      Continue with Google
                     </button>
                   </form>
                 </div>
@@ -1421,6 +1733,50 @@ export default function App() {
         notifications={adminNotifications}
         onUpdateNotifications={setAdminNotifications}
       />
+
+      {/* Local Push Toast Notifications Container */}
+      <div className="fixed bottom-6 right-6 z-[9999] space-y-3 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {localToasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, x: 100, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 100, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-950/40 shadow-2xl rounded-2xl p-4 flex gap-3.5 pointer-events-auto select-none"
+            >
+              <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-500 dark:text-amber-400 flex items-center justify-center border border-amber-100 dark:border-amber-900/40 shadow-2xs">
+                <ShieldAlert className="h-5 w-5 animate-bounce" />
+              </div>
+              <div className="flex-1 space-y-0.5 text-left">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-zinc-900 dark:text-white leading-tight">
+                    {toast.title}
+                  </h4>
+                  <button
+                    onClick={() => setLocalToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+                    className="p-1 -mr-1 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed font-medium">
+                  {toast.message}
+                </p>
+                <div className="pt-1.5 flex items-center gap-1.5">
+                  <span className="text-[8px] font-bold font-mono px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30">
+                    URGENT CARE
+                  </span>
+                  <span className="text-[9px] text-zinc-400 font-medium">
+                    Tag: {toast.tagNumber}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
     </div>
   );

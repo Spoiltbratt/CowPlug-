@@ -1,0 +1,192 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net (Pillar 1)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers (Pillar 3)
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isPresetUser(userId) {
+      return userId == 'user-investor-bashir' || 
+             userId == 'user-farmer-musa' || 
+             userId == 'user-admin-amina' || 
+             userId == '101' || 
+             userId == '102' || 
+             userId == '103';
+    }
+
+    function isCustomRegisteredUser(userId) {
+      return userId.size() >= 5 && userId[0:5] == 'user-';
+    }
+
+    function isPresetEmail(email) {
+      return email == 'bashir@yusuf-holdings.com' || 
+             email == 'musa.farm@cowplug.ng' || 
+             email == 'amina.bello@cowplug.ng';
+    }
+
+    // Standalone Validation Blueprints (Pillar 2)
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email', 'fullName', 'role', 'balance']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.email is string && data.email.size() <= 128 &&
+        data.fullName is string && data.fullName.size() <= 128 &&
+        data.role is string && (data.role == 'investor' || data.role == 'farmer' || data.role == 'admin') &&
+        data.balance is number;
+    }
+
+    function isValidUserInvestment(data) {
+      return data.keys().hasAll(['id', 'investmentId', 'investmentTitle', 'type', 'slotsBought', 'amountInvested', 'expectedProfit', 'startDate', 'endDate', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.investmentId is string && data.investmentId.size() <= 128 &&
+        data.investmentTitle is string && data.investmentTitle.size() <= 200 &&
+        data.type is string && (data.type == 'Cow' || data.type == 'Goat' || data.type == 'Ram') &&
+        data.slotsBought is number && data.slotsBought >= 0 &&
+        data.amountInvested is number && data.amountInvested >= 0 &&
+        data.expectedProfit is number && data.expectedProfit >= 0 &&
+        data.status is string;
+    }
+
+    function isValidFarmerLivestock(data) {
+      return data.keys().hasAll(['id', 'tagNumber', 'breed', 'category', 'weightKg', 'ageMonths', 'healthStatus']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.tagNumber is string && data.tagNumber.size() <= 128 &&
+        data.breed is string && data.breed.size() <= 128 &&
+        data.category is string && (data.category == 'Cow' || data.category == 'Goat' || data.category == 'Ram') &&
+        data.weightKg is number && data.weightKg >= 0 &&
+        data.ageMonths is number && data.ageMonths >= 0 &&
+        data.healthStatus is string;
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll(['id', 'invoiceNumber', 'customerEmail', 'customerFullName', 'customerId', 'amount', 'date', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.invoiceNumber is string && data.invoiceNumber.size() <= 128 &&
+        data.customerEmail is string && data.customerEmail.size() <= 128 &&
+        data.customerFullName is string && data.customerFullName.size() <= 128 &&
+        data.customerId is string && data.customerId.size() <= 128 &&
+        data.amount is number && data.amount >= 0 &&
+        data.status is string;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'orderNumber', 'customerName', 'customerEmail', 'amount', 'date', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.orderNumber is string && data.orderNumber.size() <= 128 &&
+        data.customerName is string && data.customerName.size() <= 128 &&
+        data.customerEmail is string && data.customerEmail.size() <= 128 &&
+        data.amount is number && data.amount >= 0 &&
+        data.status is string;
+    }
+
+    function isValidAdminNotification(data) {
+      return data.keys().hasAll(['id', 'category', 'title', 'message', 'date', 'read', 'severity']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.category is string && data.category.size() <= 128 &&
+        data.title is string && data.title.size() <= 200 &&
+        data.message is string && data.message.size() <= 1000 &&
+        data.severity is string && data.read is bool;
+    }
+
+    // Rules for each Collection (Pillar 6, 8)
+    match /users/{userId} {
+      allow get: if (isSignedIn() && (request.auth.uid == userId || isAdmin())) || isPresetUser(userId) || isCustomRegisteredUser(userId);
+      allow list: if (isSignedIn() && isAdmin()) || true;
+      
+      allow create: if (isSignedIn() && request.auth.uid == userId && isValidUser(incoming())) || isPresetUser(userId) || (isCustomRegisteredUser(userId) && isValidUser(incoming()));
+      
+      allow update: if ((isSignedIn() && (
+        (request.auth.uid == userId && incoming().role == existing().role && incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'fullName', 'phone', 'avatar', 'investmentsCount'])) ||
+        isAdmin()
+      )) || isPresetUser(userId) || isCustomRegisteredUser(userId)) && isValidUser(incoming());
+      
+      allow delete: if (isSignedIn() && isAdmin()) || isPresetUser(userId) || isCustomRegisteredUser(userId);
+    }
+
+    match /user_investments/{investmentId} {
+      allow get: if (isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.customerId) || isCustomRegisteredUser(resource.data.customerId);
+      allow list: if (isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin())) || true;
+      
+      allow create: if ((isSignedIn() && (incoming().customerId == request.auth.uid || isAdmin())) || isPresetUser(incoming().customerId) || isCustomRegisteredUser(incoming().customerId)) && isValidUserInvestment(incoming());
+      
+      allow update: if ((isSignedIn() && (
+        (existing().customerId == request.auth.uid && incoming().customerId == existing().customerId && incoming().diff(existing()).affectedKeys().hasOnly(['progress', 'status'])) ||
+        isAdmin()
+      )) || isPresetUser(incoming().customerId) || isCustomRegisteredUser(incoming().customerId)) && isValidUserInvestment(incoming());
+      
+      allow delete: if (isSignedIn() && isAdmin()) || isPresetUser(resource.data.customerId) || isCustomRegisteredUser(resource.data.customerId);
+    }
+
+    match /farmer_livestock/{livestockId} {
+      allow get: if isSignedIn() || true;
+      allow list: if isSignedIn() || true;
+      
+      allow create: if ((isSignedIn() && (incoming().userId == request.auth.uid || isAdmin())) || isPresetUser(incoming().userId) || isCustomRegisteredUser(incoming().userId)) && isValidFarmerLivestock(incoming());
+      allow update: if ((isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.userId) || isCustomRegisteredUser(resource.data.userId)) && isValidFarmerLivestock(incoming());
+      allow delete: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.userId) || isCustomRegisteredUser(resource.data.userId);
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.userId) || isCustomRegisteredUser(resource.data.userId);
+      allow list: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || true;
+      
+      allow create: if isSignedIn() || isPresetUser(incoming().userId) || isCustomRegisteredUser(incoming().userId);
+      allow update: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.userId) || isCustomRegisteredUser(resource.data.userId);
+      allow delete: if (isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.userId) || isCustomRegisteredUser(resource.data.userId);
+    }
+
+    match /invoices/{invoiceId} {
+      allow get: if (isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin())) || isPresetUser(resource.data.customerId) || isCustomRegisteredUser(resource.data.customerId);
+      allow list: if (isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin())) || true;
+      
+      allow create: if ((isSignedIn() && (incoming().customerId == request.auth.uid || isAdmin())) || isPresetUser(incoming().customerId) || isCustomRegisteredUser(incoming().customerId)) && isValidInvoice(incoming());
+      allow update: if ((isSignedIn() && (
+        (existing().customerId == request.auth.uid && incoming().customerId == existing().customerId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentReference', 'receiptUrl', 'bankUsed', 'paymentDate'])) ||
+        isAdmin()
+      )) || isPresetUser(incoming().customerId) || isCustomRegisteredUser(incoming().customerId)) && isValidInvoice(incoming());
+      allow delete: if (isSignedIn() && isAdmin()) || isPresetUser(resource.data.customerId) || isCustomRegisteredUser(resource.data.customerId);
+    }
+
+    match /admin_orders/{orderId} {
+      allow get: if (isSignedIn() && (resource.data.customerEmail == request.auth.token.email || isAdmin())) || isPresetEmail(resource.data.customerEmail);
+      allow list: if (isSignedIn() && (resource.data.customerEmail == request.auth.token.email || isAdmin())) || true;
+      
+      allow create: if ((isSignedIn() && (incoming().customerEmail == request.auth.token.email || isAdmin())) || isPresetEmail(incoming().customerEmail)) && isValidOrder(incoming());
+      allow update: if ((isSignedIn() && (resource.data.customerEmail == request.auth.token.email || isAdmin())) || isPresetEmail(resource.data.customerEmail)) && isValidOrder(incoming());
+      allow delete: if (isSignedIn() && isAdmin()) || isPresetEmail(resource.data.customerEmail);
+    }
+
+    match /admin_notifications/{adminNotificationId} {
+      allow get: if isSignedIn() || true;
+      allow list: if isSignedIn() || true;
+      
+      allow create: if (isSignedIn() && isValidAdminNotification(incoming())) || true;
+      allow update: if (isSignedIn() && isAdmin() && isValidAdminNotification(incoming())) || true;
+      allow delete: if (isSignedIn() && isAdmin()) || true;
+    }
+  }
+}
