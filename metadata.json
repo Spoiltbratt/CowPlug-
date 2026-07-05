@@ -1,0 +1,8 @@
+{
+  "name": "Remix: CowPlugNG",
+  "description": "Nigerian livestock investment and cattle management platform connecting farmers, investors, and meat buyers with secure financial features.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
