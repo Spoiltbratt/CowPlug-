@@ -12,7 +12,13 @@
         "phone": { "type": "string" },
         "balance": { "type": "number" },
         "investmentsCount": { "type": "number" },
-        "avatar": { "type": "string" }
+        "avatar": { "type": "string" },
+        "address": { "type": "string" },
+        "nextOfKin": { "type": "string" },
+        "nin": { "type": "string" },
+        "yearsOfExperience": { "type": "number" },
+        "guarantorName": { "type": "string" },
+        "guarantorPhone": { "type": "string" }
       },
       "required": ["id", "email", "fullName", "role", "balance"]
     },
@@ -80,7 +86,7 @@
     },
     "Invoice": {
       "title": "Invoice",
-      "description": "Financial invoices for wallet fundings or withdrawals",
+      "description": "Financial invoices for account fundings or withdrawals",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -138,6 +144,53 @@
         "severity": { "type": "string" }
       },
       "required": ["id", "category", "title", "message", "date", "read", "severity"]
+    },
+    "Custodian": {
+      "title": "Custodian",
+      "description": "Herdsman/Custodian profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "suspended"] },
+        "farmIds": { "type": "array", "items": { "type": "string" } },
+        "assignedLivestockIds": { "type": "array", "items": { "type": "string" } },
+        "address": { "type": "string" },
+        "nextOfKin": { "type": "string" },
+        "nin": { "type": "string" },
+        "yearsOfExperience": { "type": "number" },
+        "guarantorName": { "type": "string" },
+        "guarantorPhone": { "type": "string" }
+      },
+      "required": ["id", "userId", "fullName", "status"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Management broadcasts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string", "enum": ["general", "emergency"] }
+      },
+      "required": ["id", "title", "message", "date", "type"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "Career opportunities",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "requirements": { "type": "string" },
+        "postedDate": { "type": "string" }
+      },
+      "required": ["id", "title", "description", "postedDate"]
     }
   },
   "firestore": {
@@ -168,6 +221,18 @@
     "/admin_notifications/{adminNotificationId}": {
       "schema": "AdminNotification",
       "description": "CowPlugNG operational notification logs"
+    },
+    "/custodians/{custodianId}": {
+      "schema": "Custodian",
+      "description": "CowPlugNG livestock custodians"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "CowPlugNG management announcements"
+    },
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "CowPlugNG job openings"
     }
   }
 }

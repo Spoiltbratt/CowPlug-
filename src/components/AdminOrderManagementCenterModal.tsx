@@ -421,7 +421,7 @@ export const AdminOrderManagementCenterModal: React.FC<AdminOrderManagementCente
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs flex justify-between items-start">
                       <div className="space-y-2">
                         <div className="header">
-                          <span className="text-[10px] font-extrabold uppercase font-mono tracking-widest text-emerald-600 dark:text-emerald-400 block">COWPLUG NG ESCROW DEED</span>
+                          <span className="text-[10px] font-extrabold uppercase font-mono tracking-widest text-emerald-600 dark:text-emerald-400 block">COWPLUG NG TRANSACTION DEED</span>
                           <h3 className="font-display font-black text-2xl text-zinc-950 dark:text-white mt-1 title">
                             {selectedOrder.orderNumber}
                           </h3>
@@ -473,7 +473,7 @@ export const AdminOrderManagementCenterModal: React.FC<AdminOrderManagementCente
                             <strong className="text-zinc-800 dark:text-zinc-200">{selectedOrder.packageType}</strong>
                           </div>
                           <div>
-                            <span className="text-zinc-400 block">Escrow ID</span>
+                            <span className="text-zinc-400 block">Transaction ID</span>
                             <strong className="text-zinc-800 dark:text-zinc-200 font-mono">{selectedOrder.invoiceId}</strong>
                           </div>
                           <div>
@@ -530,14 +530,14 @@ export const AdminOrderManagementCenterModal: React.FC<AdminOrderManagementCente
                     <div className="relative pl-6 space-y-6 border-l border-zinc-150 dark:border-zinc-800 ml-3 text-xs pt-1">
                       {[
                         { step: 'Animal Selected', desc: 'Livestock selected from range stock catalog' },
-                        { step: 'Invoice Generated', desc: 'Secure escrow banking receipt dispatched' },
+                        { step: 'Invoice Generated', desc: 'Secure banking receipt dispatched' },
                         { step: 'Receipt Uploaded', desc: 'Bank remittance docket uploaded' },
                         { step: 'Payment Verified', desc: 'Cleared and approved by billing department' },
                         { step: 'Preparing Animal', desc: 'Biometric RFID chip and weight profiling' },
                         { step: 'Veterinary Inspection', desc: 'Diagnostic health screening and vaccination' },
                         { step: 'Ready for Transportation', desc: 'Cleared and assigned to Cold Logistics Partner' },
                         { step: 'In Transit', desc: 'Dispatched to target hub point' },
-                        { step: 'Delivered', desc: 'Signed receipt uploaded and escrow settled' }
+                        { step: 'Delivered', desc: 'Signed receipt uploaded and payment settled' }
                       ].map((item, idx) => {
                         const currentIdx = stepList.indexOf(selectedOrder.fulfillmentStep);
                         const itemIdx = stepList.indexOf(item.step as any);

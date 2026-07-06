@@ -1,18 +1,16 @@
 import { Shield, Sprout, ShoppingCart, CheckCircle, ArrowRight, Eye, Heart, Truck, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
-import PricingPackages from './PricingPackages';
 
 interface AboutProps {
-  onRegisterFarmer: () => void;
-  onLearnMoreMarketplace: () => void;
+  onViewOpportunities: () => void;
 }
 
-export default function About({ onRegisterFarmer, onLearnMoreMarketplace }: AboutProps) {
+export default function About({ onViewOpportunities }: AboutProps) {
   
   const focusSteps = [
     {
       title: 'Buy Livestock Today',
-      description: 'Select from certified, healthy cows, goats, or rams inside our verified digital marketplace.',
+      description: 'Select from certified, healthy cows, goats, or rams inside our verified digital catalog.',
       icon: <ShoppingCart className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
     },
     {
@@ -46,6 +44,36 @@ export default function About({ onRegisterFarmer, onLearnMoreMarketplace }: Abou
     <section className="py-20 bg-slate-50 dark:bg-zinc-900/40 transition-colors" id="about">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
         
+        {/* Call to action section for Farmers registration */}
+        <div className="rounded-3xl bg-zinc-900 text-white p-8 sm:p-12 relative overflow-hidden shadow-xl">
+          <div className="absolute top-0 right-0 opacity-10 pointer-events-none">
+            <svg className="h-96 w-96 text-white" fill="currentColor" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" />
+            </svg>
+          </div>
+          
+          <div className="relative z-10 max-w-3xl space-y-6">
+            <div className="inline-flex items-center space-x-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1 text-[11px] font-bold text-emerald-400 font-mono uppercase">
+              <Sparkles className="h-3 w-3" />
+              <span>Livestock Custodian Network</span>
+            </div>
+            <h3 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl tracking-tight leading-tight">
+              Join Our Network of Professionals
+            </h3>
+            <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
+              Explore available opportunities to join CowPlugNG. Browse open roles, apply directly, and build a professional career in livestock management and agricultural tech.
+            </p>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <button
+                onClick={onViewOpportunities}
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-600/10"
+              >
+                View Opportunities
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Header Title */}
         <div className="text-center max-w-3xl mx-auto">
           <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50 dark:bg-emerald-950/50 border border-slate-200/80 dark:border-emerald-500/10 px-3.5 py-1.5 rounded-full">
@@ -131,45 +159,6 @@ export default function About({ onRegisterFarmer, onLearnMoreMarketplace }: Abou
           </div>
         </div>
 
-        {/* Pricing Packages Section */}
-        <PricingPackages onChoosePackage={onLearnMoreMarketplace} />
-
-        {/* Call to action section for Farmers registration & marketplace browse */}
-        <div className="rounded-3xl bg-zinc-900 text-white p-8 sm:p-12 relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 right-0 opacity-10 pointer-events-none">
-            <svg className="h-96 w-96 text-white" fill="currentColor" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" />
-            </svg>
-          </div>
-          
-          <div className="relative z-10 max-w-3xl space-y-6">
-            <div className="inline-flex items-center space-x-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-3 py-1 text-[11px] font-bold text-emerald-400 font-mono uppercase">
-              <Sparkles className="h-3 w-3" />
-              <span>Certified Pastoral Network</span>
-            </div>
-            <h3 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl tracking-tight leading-tight">
-              Are you a local pastoralist or professional herdsman?
-            </h3>
-            <p className="text-zinc-300 text-sm sm:text-base leading-relaxed">
-              We empower local herdsmen across Nigeria with professional veterinary registers, animal health guidelines, and high-quality nutrition support. Plug your farm into CowPlugNG and get paid professional monthly management fees.
-            </p>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <button
-                onClick={onRegisterFarmer}
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-600/10"
-              >
-                Apply to Raise Livestock
-              </button>
-              <button
-                onClick={onLearnMoreMarketplace}
-                className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-bold rounded-xl text-xs sm:text-sm border border-zinc-700 transition-all"
-              >
-                Browse Livestock Catalogue
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Coming Soon Section */}
         <div className="space-y-8 pt-12 border-t border-slate-200/50 dark:border-zinc-800/50">
           <div className="text-center max-w-xl mx-auto">
@@ -189,7 +178,7 @@ export default function About({ onRegisterFarmer, onLearnMoreMarketplace }: Abou
               { title: 'AI Health Monitoring', desc: 'Predictive health trends' },
               { title: 'Automated Weight Tracking', desc: 'Electronic load-cell scaling' },
               { title: 'Livestock Insurance Integration', desc: 'Third-party coverage' },
-              { title: 'Veterinary Marketplace', desc: 'Direct-to-ranch veterinary logs' },
+              { title: 'Veterinary Logs', desc: 'Direct-to-ranch veterinary logs' },
               { title: 'Mobile App', desc: 'iOS & Android management portals' }
             ].map((f, idx) => (
               <div key={idx} className="bg-white dark:bg-zinc-950 p-5 rounded-2xl border border-slate-200/60 dark:border-zinc-800/80 relative overflow-hidden flex flex-col justify-between h-28">

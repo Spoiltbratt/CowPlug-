@@ -18,19 +18,6 @@ export interface Investment {
   expectedValueAtMaturity?: number;
 }
 
-export interface MarketplaceAnimal {
-  id: string;
-  breed: string;
-  category: 'Cow' | 'Goat' | 'Ram';
-  ageMonths: number;
-  weightKg: number;
-  healthStatus: 'Excellent' | 'Under Observation' | 'Fully Vaccinated';
-  price: number; // in NGN
-  image: string;
-  location: string;
-  gender: 'Male' | 'Female';
-}
-
 export interface BlogArticle {
   id: string;
   title: string;
@@ -43,7 +30,7 @@ export interface BlogArticle {
   content: string;
 }
 
-export type UserRole = 'investor' | 'farmer' | 'admin';
+export type UserRole = 'investor' | 'farmer' | 'admin' | 'custodian';
 
 export interface User {
   id: string;
@@ -54,6 +41,12 @@ export interface User {
   balance: number; // in NGN
   investmentsCount: number;
   avatar: string;
+  address?: string;
+  nextOfKin?: string;
+  nin?: string;
+  yearsOfExperience?: number;
+  guarantorName?: string;
+  guarantorPhone?: string;
 }
 
 export interface AppNotification {
@@ -65,17 +58,19 @@ export interface AppNotification {
   read: boolean;
 }
 
-export interface QuoteRequest {
+export interface SourcingRequest {
   id: string;
-  companyName: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  meatType: 'Beef' | 'Goat Meat' | 'Ram Meat' | 'Mixed Bulk';
-  quantityKg: number;
-  deliveryLocation: string;
-  additionalNotes: string;
-  status: 'Pending' | 'Approved' | 'Dispatched';
+  investorId: string;
+  investorName: string;
+  category: 'Cow' | 'Goat' | 'Ram';
+  breed: string;
+  quantity: number;
+  budget?: number;
+  feedingPackage: string;
+  deliveryPreference: string;
+  intendedPurpose: string;
+  status: 'Awaiting Invoice' | 'Invoice Generated' | 'Cancelled';
+  date: string;
 }
 
 export interface FarmerLivestock {
@@ -110,4 +105,18 @@ export interface UserInvestment {
   endDate: string;
   status: 'Active' | 'Completed' | 'Pending';
   progress: number; // 0 to 100
+}
+
+export interface QuoteRequest {
+  id: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  meatType: 'Beef' | 'Goat Meat' | 'Ram Meat' | 'Mixed Bulk';
+  quantityKg: number;
+  deliveryLocation: string;
+  additionalNotes?: string;
+  status: 'Pending' | 'Processed' | 'Cancelled';
+  date: string;
 }

@@ -8,7 +8,7 @@ import {
 
 export interface AdminNotification {
   id: string;
-  category: 'User Activity' | 'Payments' | 'Marketplace' | 'Livestock' | 'Orders' | 'Security';
+  category: 'User Activity' | 'Payments' | 'Livestock' | 'Orders' | 'Security';
   title: string;
   message: string;
   date: string;
@@ -43,7 +43,7 @@ export const AdminNotificationCenterModal: React.FC<AdminNotificationCenterModal
   if (!isOpen) return null;
 
   const categories: ('All' | AdminNotification['category'])[] = [
-    'All', 'User Activity', 'Payments', 'Marketplace', 'Livestock', 'Orders', 'Security'
+    'All', 'User Activity', 'Payments', 'Livestock', 'Orders', 'Security'
   ];
 
   const getCategoryIcon = (category: AdminNotification['category']) => {
@@ -52,8 +52,6 @@ export const AdminNotificationCenterModal: React.FC<AdminNotificationCenterModal
         return <User className="h-4 w-4" />;
       case 'Payments':
         return <Wallet className="h-4 w-4" />;
-      case 'Marketplace':
-        return <ShoppingCart className="h-4 w-4" />;
       case 'Livestock':
         return <HeartPulse className="h-4 w-4" />;
       case 'Orders':
@@ -71,8 +69,6 @@ export const AdminNotificationCenterModal: React.FC<AdminNotificationCenterModal
         return 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-900/30';
       case 'Payments':
         return 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-900/30';
-      case 'Marketplace':
-        return 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-900/30';
       case 'Livestock':
         return 'bg-purple-50 text-purple-700 border-purple-100 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-900/30';
       case 'Orders':
@@ -121,8 +117,6 @@ export const AdminNotificationCenterModal: React.FC<AdminNotificationCenterModal
       onOpenTab('customers');
     } else if (notif.category === 'Livestock') {
       onOpenTab('livestock');
-    } else if (notif.category === 'Marketplace') {
-      onOpenTab('marketplace');
     } else if (notif.category === 'Orders') {
       onOpenTab('meat-orders');
     } else if (notif.category === 'Security') {

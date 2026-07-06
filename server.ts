@@ -3,6 +3,8 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { google } from "googleapis";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -11,6 +13,167 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(cookieParser());
+
+  const getOAuth2Client = (req: express.Request) => {
+    return new google.auth.OAuth2(
+      process.env.OAUTH_CLIENT_ID,
+      process.env.OAUTH_CLIENT_SECRET,
+      `${process.env.APP_URL}/api/oauth/callback`
+    );
+  };
+
+  app.get("/api/oauth/url", (req, res) => {
+    const oauth2Client = getOAuth2Client(req);
+    const scopes = [
+      "https://mail.google.com/",
+      "https://www.googleapis.com/auth/gmail.compose",
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/contacts",
+      "https://www.googleapis.com/auth/contacts.other.readonly",
+      "https://www.googleapis.com/auth/contacts.readonly",
+      "https://www.googleapis.com/auth/directory.readonly",
+      "https://www.googleapis.com/auth/user.addresses.read",
+      "https://www.googleapis.com/auth/user.birthday.read",
+      "https://www.googleapis.com/auth/user.emails.read",
+      "https://www.googleapis.com/auth/user.gender.read",
+      "https://www.googleapis.com/auth/user.organization.read",
+      "https://www.googleapis.com/auth/user.phonenumbers.read"
+    ];
+    const url = oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: scopes,
+      prompt: "consent",
+    });
+    res.json({ url });
+  });
+
+  app.get("/api/oauth/callback", async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.status(400).send("No code provided");
+
+    try {
+      const oauth2Client = getOAuth2Client(req);
+      const { tokens } = await oauth2Client.getToken(code as string);
+      
+      res.cookie("google_tokens", JSON.stringify(tokens), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+
+      res.redirect("/");
+    } catch (error) {
+      console.error("Error during OAuth callback:", error);
+      res.redirect("/?error=oauth_failed");
+    }
+  });
+
+  app.get("/api/oauth/status", (req, res) => {
+    const tokens = req.cookies.google_tokens;
+    res.json({ isAuthenticated: !!tokens });
+  });
+
+  app.post("/api/oauth/logout", (req, res) => {
+    res.clearCookie("google_tokens");
+    res.json({ success: true });
+  });
+
+  app.get("/api/gmail/messages", async (req, res) => {
+    const tokensCookie = req.cookies.google_tokens;
+    if (!tokensCookie) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const tokens = JSON.parse(tokensCookie);
+      const oauth2Client = getOAuth2Client(req);
+      oauth2Client.setCredentials(tokens);
+
+      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+      const response = await gmail.users.messages.list({
+        userId: "me",
+        maxResults: 15,
+      });
+      
+      const messages = [];
+      for (const msg of response.data.messages || []) {
+        const msgDetails = await gmail.users.messages.get({
+          userId: "me",
+          id: msg.id as string,
+        });
+        messages.push(msgDetails.data);
+      }
+      
+      res.json({ messages });
+    } catch (error: any) {
+      console.error("Error fetching Gmail messages:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/gmail/send", async (req, res) => {
+    const tokensCookie = req.cookies.google_tokens;
+    if (!tokensCookie) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const tokens = JSON.parse(tokensCookie);
+      const oauth2Client = getOAuth2Client(req);
+      oauth2Client.setCredentials(tokens);
+
+      const { to, subject, text } = req.body;
+      const gmail = google.gmail({ version: "v1", auth: oauth2Client });
+      
+      const rawMessage = [
+        `To: ${to}`,
+        `Subject: ${subject}`,
+        '',
+        text
+      ].join('\n');
+      
+      const encodedMessage = Buffer.from(rawMessage).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      
+      const response = await gmail.users.messages.send({
+        userId: "me",
+        requestBody: {
+          raw: encodedMessage
+        }
+      });
+      res.json(response.data);
+    } catch (error: any) {
+      console.error("Error sending Gmail message:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/contacts", async (req, res) => {
+    const tokensCookie = req.cookies.google_tokens;
+    if (!tokensCookie) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const tokens = JSON.parse(tokensCookie);
+      const oauth2Client = getOAuth2Client(req);
+      oauth2Client.setCredentials(tokens);
+
+      const people = google.people({ version: "v1", auth: oauth2Client });
+      const response = await people.people.connections.list({
+        resourceName: "people/me",
+        personFields: "names,emailAddresses,phoneNumbers",
+        pageSize: 100,
+      });
+      
+      res.json({ contacts: response.data.connections || [] });
+    } catch (error: any) {
+      console.error("Error fetching Contacts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Lazy-loaded Gemini client
   let aiClient: GoogleGenAI | null = null;

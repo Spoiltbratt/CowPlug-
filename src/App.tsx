@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, ShieldAlert, LogIn, X, Users, Briefcase, TrendingUp, Leaf, Zap, Home, ShoppingBag, Heart, DollarSign, User as UserIcon } from 'lucide-react';
 
-import { User, UserInvestment, FarmerLivestock, AppNotification, MarketplaceAnimal } from './types';
-import { Invoice } from './types_payments';
+import { User, UserInvestment, FarmerLivestock, AppNotification } from './types';
+import { Invoice, BankDetails } from './types_payments';
 import { INITIAL_NOTIFICATIONS } from './data';
 
 import { AdminOrderManagementCenterModal, Order } from './components/AdminOrderManagementCenterModal';
@@ -12,7 +12,6 @@ import { AdminNotificationCenterModal, AdminNotification } from './components/Ad
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import About from './components/About';
-import Marketplace from './components/Marketplace';
 
 // Firebase Integrations
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
@@ -42,7 +41,7 @@ import BlogFAQ from './components/BlogFAQ';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import MarketRates from './components/MarketRates';
-import LiteModeApp from './components/LiteModeApp';
+import OpportunitiesPage from './components/OpportunitiesPage';
 
 // Quick Preset Users for reviewers to instantly preview CowPlugNG's custom dashboards
 const PRESET_USERS: Record<'investor' | 'farmer' | 'admin', User> = {
@@ -203,21 +202,61 @@ export default function App() {
     return 'dashboard';
   });
 
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cp_dark_mode');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('cp_dark_mode', String(darkMode));
+  }, [darkMode]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setDarkMode(e.matches);
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
   
   const [experienceMode, setExperienceMode] = useState<'lite' | 'pro'>(() => {
-    const saved = localStorage.getItem('cp_experience_mode');
-    return (saved as 'lite' | 'pro') || 'lite';
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cp_experience_mode');
+      if (saved === 'lite' || saved === 'pro') return saved;
+    }
+    return 'pro';
   });
 
   const [liteActiveTab, setLiteActiveTab] = useState<'home' | 'buy' | 'my-animals' | 'find-animal' | 'payments' | 'receive' | 'profile' | 'rates'>(() => {
-    const saved = localStorage.getItem('cp_lite_active_tab');
-    return (saved as any) || 'home';
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cp_lite_active_tab') as any;
+      if (saved) return saved;
+    }
+    return 'home';
   });
 
-  const [showFirstLaunchModal, setShowFirstLaunchModal] = useState(() => {
-    return !localStorage.getItem('cp_experience_mode_chosen');
+  const [showFirstLaunchModal, setShowFirstLaunchModal] = useState(false);
+
+  const [companyBankDetails, setCompanyBankDetails] = useState<BankDetails>(() => {
+    const saved = localStorage.getItem('cp_company_bank');
+    if (saved) return JSON.parse(saved);
+    return {
+      bankName: 'Sterling Bank Plc',
+      accountName: 'CowPlug Nigeria Ltd',
+      accountNumber: '0092817261'
+    };
   });
+
+  useEffect(() => {
+    localStorage.setItem('cp_company_bank', JSON.stringify(companyBankDetails));
+  }, [companyBankDetails]);
 
   useEffect(() => {
     localStorage.setItem('cp_experience_mode', experienceMode);
@@ -346,7 +385,7 @@ export default function App() {
       },
       {
         id: 'an-3',
-        category: 'Marketplace',
+        category: 'Livestock',
         title: 'Listing awaiting approval',
         message: 'White Fulani Cow listed by Farmer Chioma Nze is awaiting supervisor review.',
         date: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
@@ -397,7 +436,7 @@ export default function App() {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register-choose' | 'register-form'>('login');
-  const [selectedRegRole, setSelectedRegRole] = useState<'investor' | 'farmer'>('investor');
+  const [selectedRegRole, setSelectedRegRole] = useState<'investor' | 'farmer' | 'custodian'>('investor');
 
   // Secure admin hash listener & manual homepage routing with logged-in dashboard redirect
   useEffect(() => {
@@ -574,10 +613,6 @@ export default function App() {
     const saved = localStorage.getItem('cp_notifications');
     return saved ? JSON.parse(saved) : INITIAL_NOTIFICATIONS;
   });
-
-  // Marketplace Cart Storage
-  const [cartItems, setCartItems] = useState<{ animal: MarketplaceAnimal; quantity: number }[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
 
   // Invoices Storage
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
@@ -788,22 +823,6 @@ export default function App() {
     }));
   };
 
-  const handleAddToCart = (animal: MarketplaceAnimal) => {
-    setCartItems((prev) => {
-      const exists = prev.find((item) => item.animal.id === animal.id);
-      if (exists) return prev;
-      return [...prev, { animal, quantity: 1 }];
-    });
-  };
-
-  const handleRemoveFromCart = (id: string) => {
-    setCartItems((prev) => prev.filter((item) => item.animal.id !== id));
-  };
-
-  const handleClearCart = () => {
-    setCartItems([]);
-  };
-
   const handleQuickLogin = async (role: 'investor' | 'farmer' | 'admin') => {
     const preset = PRESET_USERS[role];
     await seedUserIfMissing(preset, [], [], INITIAL_NOTIFICATIONS);
@@ -829,7 +848,7 @@ export default function App() {
     return false;
   };
 
-  const handleCustomRegister = async (fullName: string, email: string, phone: string) => {
+  const handleCustomRegister = async (fullName: string, email: string, phone: string, address?: string, nextOfKin?: string, nin?: string, yearsOfExperience?: number, guarantorName?: string, guarantorPhone?: string) => {
     const trimmedEmail = email.trim().toLowerCase();
     const existing = usersList.find((u) => u.email.toLowerCase() === trimmedEmail);
     if (existing) {
@@ -840,13 +859,19 @@ export default function App() {
       id: `user-${Date.now()}`,
       email: trimmedEmail,
       fullName: fullName,
-      role: selectedRegRole, // 'investor' or 'farmer'
+      role: selectedRegRole, // 'investor' or 'farmer' or 'custodian'
       phone: phone || '+234 803 000 0000',
       balance: selectedRegRole === 'investor' ? 500000 : 0, // Give custom test balance to new customers
       investmentsCount: 0,
       avatar: selectedRegRole === 'investor'
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200'
         : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200',
+      address: address,
+      nextOfKin: nextOfKin,
+      nin: nin,
+      yearsOfExperience: yearsOfExperience,
+      guarantorName: guarantorName,
+      guarantorPhone: guarantorPhone
     };
 
     setUsersList((prev) => [...prev, newUser]);
@@ -902,77 +927,6 @@ export default function App() {
     }
   };
 
-  const handlePurchaseLivestock = (
-    animals: MarketplaceAnimal[],
-    option: 'deliver' | 'farm',
-    feedingPlan?: string,
-    animalPackages?: Record<string, string>
-  ) => {
-    const total = animals.reduce((sum, an) => sum + an.price, 0);
-    handleClearCart();
-    
-    // Generate invoice and order numbers
-    const orderNumber = `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-    const invoiceNumber = `INV-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-    
-    // Create pending Order object in the "Awaiting Payment" stage
-    const newOrder: Order = {
-      id: `ord-${Date.now()}`,
-      orderNumber: orderNumber,
-      customerName: currentUser?.fullName || 'Alhaji Bashir Yusuf',
-      customerEmail: currentUser?.email || 'bashir@yusuf-holdings.com',
-      customerPhone: currentUser?.phone || '+234 803 111 2222',
-      animalType: animals[0]?.category || 'Cow',
-      breed: animals[0]?.breed || 'White Fulani',
-      packageType: (animalPackages && animals[0] && animalPackages[animals[0].id]) || feedingPlan || 'Pasture Only',
-      amount: total,
-      date: new Date().toISOString().split('T')[0],
-      invoiceId: invoiceNumber,
-      status: 'Pending',
-      fulfillmentStep: 'Awaiting Payment',
-      internalNotes: `Manual bank transfer payment requested. Handling option: ${option === 'farm' ? 'Board at Ranch' : 'Immediate Shipping'}`
-    };
-
-    // Create pending Invoice object
-    const newInvoice: Invoice = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber: invoiceNumber,
-      customerId: currentUser?.id || '101',
-      customerFullName: currentUser?.fullName || 'Alhaji Bashir Yusuf',
-      customerEmail: currentUser?.email || 'bashir@yusuf-holdings.com',
-      amount: total,
-      date: new Date().toISOString().split('T')[0],
-      status: 'Pending Payment',
-      auditLog: [
-        {
-          date: new Date().toISOString(),
-          status: 'Pending Payment',
-          actionBy: currentUser?.fullName || 'Customer',
-          notes: `Pending invoice generated for ${animals.length} animals. Bank transfer details sent.`
-        }
-      ]
-    };
-
-    setAdminOrders(prev => [newOrder, ...prev]);
-    setInvoices(prev => [newInvoice, ...prev]);
-
-    dbAddAdminOrder(newOrder);
-    if (currentUser) {
-      dbAddInvoice(newInvoice, currentUser.id);
-    } else {
-      dbAddInvoice(newInvoice, '101');
-    }
-
-    handleDispatchNotification({
-      id: `notif-purchase-pending-${Date.now()}`,
-      type: 'system',
-      title: '📑 Invoice & Bank Transfer Details Generated',
-      message: `Invoice ${invoiceNumber} (${orderNumber}) generated for ${animals.length} animals. Please complete the bank transfer and upload your receipt in your dashboard.`,
-      date: new Date().toISOString(),
-      read: false
-    });
-  };
-
   return (
     <div className={(darkMode ? 'dark bg-zinc-950 text-zinc-100' : 'bg-white text-zinc-800') + ' min-h-screen theme-transition'}>
       
@@ -990,8 +944,8 @@ export default function App() {
         }}
         notifications={notifications}
         onMarkNotificationsRead={handleMarkNotificationsRead}
-        cartCount={cartItems.length}
-        onOpenCart={() => setIsCartOpen(true)}
+        cartCount={0}
+        onOpenCart={() => {}}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
         dashboardTab={dashboardTab}
@@ -1005,42 +959,9 @@ export default function App() {
       />
 
       {/* Dynamic Content Sections */}
-      <main className="transition-all duration-300 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main id="app-main-content" className="transition-all duration-300 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <AnimatePresence mode="wait">
-          {experienceMode === 'lite' ? (
-            <motion.div
-              className="w-full"
-              key="lite-mode-container"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-            >
-              <LiteModeApp
-                experienceMode={experienceMode}
-                setExperienceMode={setExperienceMode}
-                currentUser={currentUser}
-                setCurrentUser={setCurrentUser}
-                userBalance={userBalance}
-                onFundBalance={handleFundBalance}
-                onWithdrawBalance={handleWithdrawBalance}
-                onDeductBalance={handleDeductBalance}
-                farmerLivestock={farmerLivestock}
-                setFarmerLivestock={setFarmerLivestock}
-                notifications={notifications}
-                onMarkNotificationsRead={handleMarkNotificationsRead}
-                activeTab={liteActiveTab}
-                setActiveTab={setLiteActiveTab}
-                invoices={invoices}
-                onAddInvoice={handleAddInvoice}
-                onUpdateInvoice={handleUpdateInvoice}
-                onOpenAuth={() => {
-                  setAuthMode('login');
-                  setAuthModalOpen(true);
-                }}
-              />
-            </motion.div>
-          ) : (
-            <>
+          <>
               {(activeSection === 'home' || activeSection === 'home-public') && (
             <motion.div
               key="home"
@@ -1051,8 +972,8 @@ export default function App() {
               <Hero
                 experienceMode={experienceMode}
                 setExperienceMode={setExperienceMode}
-                onBuyLivestock={() => setActiveSection('marketplace')}
-                onBrowseMarketplace={() => setActiveSection('marketplace')}
+                onBuyLivestock={() => {}}
+                onBrowseCatalog={() => {}}
                 onRequestSourcing={() => {
                   setAuthMode('login');
                   setAuthModalOpen(true);
@@ -1064,11 +985,10 @@ export default function App() {
                 }}
               />
               <About
-                onRegisterFarmer={() => {
-                  setAuthMode('register-choose');
-                  setAuthModalOpen(true);
+                onViewOpportunities={() => {
+                  setActiveSection('opportunities');
+                  localStorage.setItem('cp_last_section', 'opportunities');
                 }}
-                onLearnMoreMarketplace={() => setActiveSection('marketplace')}
               />
               <Contact />
             </motion.div>
@@ -1082,37 +1002,10 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
             >
               <About
-                onRegisterFarmer={() => {
-                  setAuthMode('register-choose');
-                  setAuthModalOpen(true);
+                onViewOpportunities={() => {
+                  setActiveSection('opportunities');
+                  localStorage.setItem('cp_last_section', 'opportunities');
                 }}
-                onLearnMoreMarketplace={() => setActiveSection('marketplace')}
-              />
-            </motion.div>
-          )}
-
-          {activeSection === 'marketplace' && (
-            <motion.div
-              key="marketplace"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-            >
-              <Marketplace
-                currentUser={currentUser}
-                onOpenAuth={() => {
-                  setAuthMode('login');
-                  setAuthModalOpen(true);
-                }}
-                cartItems={cartItems}
-                onAddToCart={handleAddToCart}
-                onRemoveFromCart={handleRemoveFromCart}
-                onClearCart={handleClearCart}
-                isCartOpen={isCartOpen}
-                setIsCartOpen={setIsCartOpen}
-                userBalance={userBalance}
-                onDeductBalance={handleDeductBalance}
-                onPurchaseLivestock={handlePurchaseLivestock}
               />
             </motion.div>
           )}
@@ -1147,6 +1040,23 @@ export default function App() {
               exit={{ opacity: 0, y: -15 }}
             >
               <Contact />
+            </motion.div>
+          )}
+
+          {activeSection === 'opportunities' && (
+            <motion.div
+              key="opportunities"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <OpportunitiesPage 
+                currentUser={currentUser}
+                onNavigateHome={() => {
+                  setActiveSection('home');
+                  localStorage.setItem('cp_last_section', 'home');
+                }}
+              />
             </motion.div>
           )}
 
@@ -1261,6 +1171,8 @@ export default function App() {
                   onUpdateOrder={(id, updates) => {
                     setAdminOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
                   }}
+                  companyBankDetails={companyBankDetails}
+                  onUpdateBankDetails={setCompanyBankDetails}
                 />
               ) : (
                 <Dashboard
@@ -1285,21 +1197,29 @@ export default function App() {
                   onUpdateOrder={(id, updates) => {
                     setAdminOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
                   }}
+                  companyBankDetails={companyBankDetails}
                 />
               )}
             </motion.div>
           )}
 
           </>
-          )}
-
         </AnimatePresence>
       </main>
 
 
 
       {/* Main Corporate Footer */}
-      {experienceMode !== 'lite' && <Footer setActiveSection={setActiveSection} />}
+      {experienceMode !== 'lite' && (
+        <Footer 
+          setActiveSection={setActiveSection} 
+          onRegisterFarmer={() => {
+            setAuthMode('register-choose');
+            setSelectedRegRole('farmer');
+            setAuthModalOpen(true);
+          }}
+        />
+      )}
 
       {/* Standard Interactive Auth Modal */}
       <AnimatePresence>
@@ -1456,46 +1376,22 @@ export default function App() {
                   </div>
 
                   <div className="space-y-3 pt-2">
-                    {/* Customer choice */}
+                    {/* Custodian choice */}
                     <button
                       onClick={() => {
-                        setSelectedRegRole('investor');
+                        setSelectedRegRole('custodian');
                         setAuthMode('register-form');
                       }}
                       className="w-full text-left p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-zinc-50/50 dark:hover:bg-zinc-950/50 transition-all group"
                     >
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-xs text-zinc-900 dark:text-white">Buy & Manage Livestock</span>
                         <span className="text-emerald-600 font-extrabold text-xs">→</span>
                       </div>
                       <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                        I want to purchase livestock and have CowPlugNG manage it until I need it.
+                        Register as a livestock custodian to join the CowPlugNG workforce, receive official updates, and become eligible for farm assignments.
                       </p>
-                      <div className="mt-2 text-[10px] text-zinc-400 font-medium">
-                        Examples: Weddings • Festivals • Business • Personal use
-                      </div>
-                      <div className="mt-3 text-xs text-emerald-700 dark:text-emerald-400 font-bold group-hover:underline">
-                        Continue as Customer
-                      </div>
-                    </button>
-
-                    {/* Seller choice */}
-                    <button
-                      onClick={() => {
-                        setSelectedRegRole('farmer');
-                        setAuthMode('register-form');
-                      }}
-                      className="w-full text-left p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-amber-500 dark:hover:border-amber-500 hover:bg-zinc-50/50 dark:hover:bg-zinc-950/50 transition-all group"
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-xs text-zinc-900 dark:text-white">Sell Livestock</span>
-                        <span className="text-amber-600 font-extrabold text-xs">→</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                        I'm a verified farmer or livestock dealer and want to list livestock for sale on CowPlugNG.
-                      </p>
-                      <div className="mt-3 text-xs text-amber-700 dark:text-amber-500 font-bold group-hover:underline">
-                        Continue as Seller
+                      <div className="mt-3 text-xs text-emerald-700 dark:text-emerald-500 font-bold group-hover:underline">
+                        Continue as Custodian
                       </div>
                     </button>
                   </div>
@@ -1524,14 +1420,20 @@ export default function App() {
                   </div>
 
                   <form
-                    onSubmit={(e) => {
+                    onSubmit={async (e) => {
                       e.preventDefault();
                       const target = e.target as HTMLFormElement;
                       const name = (target.elements.namedItem('fullName') as HTMLInputElement).value;
                       const email = (target.elements.namedItem('email') as HTMLInputElement).value;
                       const phone = (target.elements.namedItem('phone') as HTMLInputElement).value;
+                      const address = (target.elements.namedItem('address') as HTMLInputElement)?.value;
+                      const nextOfKin = (target.elements.namedItem('nextOfKin') as HTMLInputElement)?.value;
+                      const nin = (target.elements.namedItem('nin') as HTMLInputElement)?.value;
+                      const yearsOfExperience = parseInt((target.elements.namedItem('yearsOfExperience') as HTMLInputElement)?.value);
+                      const guarantorName = (target.elements.namedItem('guarantorName') as HTMLInputElement)?.value;
+                      const guarantorPhone = (target.elements.namedItem('guarantorPhone') as HTMLInputElement)?.value;
                       
-                      const success = handleCustomRegister(name, email, phone);
+                      const success = await handleCustomRegister(name, email, phone, address, nextOfKin, nin, yearsOfExperience, guarantorName, guarantorPhone);
                       if (!success) {
                         alert('This email is already registered.');
                       }
@@ -1568,6 +1470,70 @@ export default function App() {
                         className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>
+                    {selectedRegRole === 'custodian' && (
+                      <>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Residential Address</label>
+                          <input
+                            name="address"
+                            type="text"
+                            required
+                            placeholder="e.g. 123 Farm Road, Lagos"
+                            className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Next of Kin</label>
+                          <input
+                            name="nextOfKin"
+                            type="text"
+                            required
+                            placeholder="e.g. Name & Phone"
+                            className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">NIN</label>
+                          <input
+                            name="nin"
+                            type="text"
+                            required
+                            placeholder="e.g. 12345678901"
+                            className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Years of Experience</label>
+                          <input
+                            name="yearsOfExperience"
+                            type="number"
+                            required
+                            placeholder="e.g. 5"
+                            className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Guarantor Name</label>
+                          <input
+                            name="guarantorName"
+                            type="text"
+                            required
+                            placeholder="e.g. John Doe"
+                            className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Guarantor Phone</label>
+                          <input
+                            name="guarantorPhone"
+                            type="tel"
+                            required
+                            placeholder="e.g. +234 803 000 0000"
+                            className="w-full px-4 py-2 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs text-zinc-800 dark:text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Security Password</label>
                       <input

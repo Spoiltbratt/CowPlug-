@@ -79,7 +79,7 @@ export default function MarketRates({ initialTab = 'livestock', onBack }: Market
   // Sample official documents for users
   const relevantDocuments = [
     {
-      title: 'CowPlugNG Livestock Escrow & Sponsorship Agreement',
+      title: 'CowPlugNG Livestock Transaction & Sponsorship Agreement',
       description: 'Standard terms governing livestock acquisition, veterinary insurance, and payout schedules.',
       type: 'PDF',
       size: '2.4 MB',
@@ -321,7 +321,7 @@ export default function MarketRates({ initialTab = 'livestock', onBack }: Market
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="space-y-1">
                 <span className="font-bold text-zinc-800 dark:text-zinc-200 block">How are these rates calculated?</span>
-                <p className="text-zinc-500 leading-relaxed text-[11px]">We aggregate real daily sales reports from our network of northern livestock breeders, regional feed mills, and digital marketplace transactions to generate a weighted retail spot pricing index.</p>
+                <p className="text-zinc-500 leading-relaxed text-[11px]">We aggregate real daily sales reports from our network of northern livestock breeders, regional feed mills, and digital transactions to generate a weighted retail spot pricing index.</p>
               </div>
               <div className="space-y-1">
                 <span className="font-bold text-zinc-800 dark:text-zinc-200 block">Can I lock in these prices?</span>

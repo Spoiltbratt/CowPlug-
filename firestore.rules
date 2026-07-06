@@ -51,12 +51,12 @@ service cloud.firestore {
 
     // Standalone Validation Blueprints (Pillar 2)
     function isValidUser(data) {
-      return data.keys().hasAll(['id', 'email', 'fullName', 'role', 'balance']) &&
+      return data.keys().hasAll(['id', 'email', 'fullName', 'role']) &&
         data.id is string && data.id.size() <= 128 &&
         data.email is string && data.email.size() <= 128 &&
         data.fullName is string && data.fullName.size() <= 128 &&
-        data.role is string && (data.role == 'investor' || data.role == 'farmer' || data.role == 'admin') &&
-        data.balance is number;
+        data.role is string && (data.role == 'investor' || data.role == 'farmer' || data.role == 'admin' || data.role == 'custodian') &&
+        (!data.keys().hasAny(['balance']) || data.balance is number);
     }
 
     function isValidUserInvestment(data) {
@@ -110,6 +110,36 @@ service cloud.firestore {
         data.title is string && data.title.size() <= 200 &&
         data.message is string && data.message.size() <= 1000 &&
         data.severity is string && data.read is bool;
+    }
+
+    function isValidCustodian(data) {
+      return data.keys().hasAll(['id', 'userId', 'fullName', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.fullName is string && data.fullName.size() <= 128 &&
+        data.status is string && (data.status == 'pending' || data.status == 'approved' || data.status == 'suspended') &&
+        (!data.keys().hasAny(['address']) || data.address is string) &&
+        (!data.keys().hasAny(['nextOfKin']) || data.nextOfKin is string) &&
+        (!data.keys().hasAny(['nin']) || data.nin is string) &&
+        (!data.keys().hasAny(['yearsOfExperience']) || data.yearsOfExperience is number) &&
+        (!data.keys().hasAny(['guarantorName']) || data.guarantorName is string) &&
+        (!data.keys().hasAny(['guarantorPhone']) || data.guarantorPhone is string);
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll(['id', 'title', 'message', 'date', 'type']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 200 &&
+        data.message is string && data.message.size() <= 2000 &&
+        data.type is string && (data.type == 'general' || data.type == 'emergency');
+    }
+
+    function isValidJob(data) {
+      return data.keys().hasAll(['id', 'title', 'description', 'postedDate']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() <= 200 &&
+        data.description is string && data.description.size() <= 2000 &&
+        data.postedDate is string;
     }
 
     // Rules for each Collection (Pillar 6, 8)
@@ -187,6 +217,30 @@ service cloud.firestore {
       allow create: if (isSignedIn() && isValidAdminNotification(incoming())) || true;
       allow update: if (isSignedIn() && isAdmin() && isValidAdminNotification(incoming())) || true;
       allow delete: if (isSignedIn() && isAdmin()) || true;
+    }
+
+    match /custodians/{custodianId} {
+      allow get: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow list: if isSignedIn() && isAdmin();
+      allow create: if isSignedIn() && isValidCustodian(incoming());
+      allow update: if isSignedIn() && isAdmin() && isValidCustodian(incoming());
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isAdmin() && isValidAnnouncement(incoming());
+      allow update: if isSignedIn() && isAdmin() && isValidAnnouncement(incoming());
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    match /jobs/{jobId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && isAdmin() && isValidJob(incoming());
+      allow update: if isSignedIn() && isAdmin() && isValidJob(incoming());
+      allow delete: if isSignedIn() && isAdmin();
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Investment, MarketplaceAnimal, BlogArticle, AppNotification } from './types';
+import { Investment, BlogArticle, AppNotification } from './types';
 
 export const INVESTMENTS: Investment[] = [
   {
@@ -60,81 +60,6 @@ export const INVESTMENTS: Investment[] = [
   }
 ];
 
-export const MARKETPLACE_ANIMALS: MarketplaceAnimal[] = [
-  {
-    id: 'mkt-1',
-    breed: 'White Fulani (Bunaji)',
-    category: 'Cow',
-    ageMonths: 24,
-    weightKg: 320,
-    healthStatus: 'Fully Vaccinated',
-    price: 480000,
-    image: 'https://images.unsplash.com/photo-1527153857715-3908f2bac5e8?auto=format&fit=crop&q=80&w=800',
-    location: 'Oyo State Ranches',
-    gender: 'Male'
-  },
-  {
-    id: 'mkt-2',
-    breed: 'Sokoto Gudali',
-    category: 'Cow',
-    ageMonths: 28,
-    weightKg: 380,
-    healthStatus: 'Excellent',
-    price: 550000,
-    image: 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?auto=format&fit=crop&q=80&w=800',
-    location: 'Kano State Hub',
-    gender: 'Male'
-  },
-  {
-    id: 'mkt-3',
-    breed: 'Red Sokoto Goat',
-    category: 'Goat',
-    ageMonths: 14,
-    weightKg: 35,
-    healthStatus: 'Fully Vaccinated',
-    price: 95000,
-    image: 'https://images.unsplash.com/photo-1608539733291-a1dfc76b9789?auto=format&fit=crop&q=80&w=800',
-    location: 'Kano Feedlot',
-    gender: 'Female'
-  },
-  {
-    id: 'mkt-4',
-    breed: 'Balami Premium Ram',
-    category: 'Ram',
-    ageMonths: 18,
-    weightKg: 65,
-    healthStatus: 'Excellent',
-    price: 180000,
-    image: 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&q=80&w=800',
-    location: 'Ogun State Ranches',
-    gender: 'Male'
-  },
-  {
-    id: 'mkt-5',
-    breed: 'Muturu Dwarf Cow',
-    category: 'Cow',
-    ageMonths: 20,
-    weightKg: 210,
-    healthStatus: 'Fully Vaccinated',
-    price: 320000,
-    image: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&q=80&w=800',
-    location: 'Enugu Ranches',
-    gender: 'Female'
-  },
-  {
-    id: 'mkt-6',
-    breed: 'Sahelian Goat',
-    category: 'Goat',
-    ageMonths: 12,
-    weightKg: 28,
-    healthStatus: 'Under Observation',
-    price: 70000,
-    image: 'https://images.unsplash.com/photo-1533048347-1793139090dd?auto=format&fit=crop&q=80&w=800',
-    location: 'Kaduna Hub',
-    gender: 'Male'
-  }
-];
-
 export const BLOG_ARTICLES: BlogArticle[] = [
   {
     id: 'blog-1',
@@ -192,7 +117,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     id: 'notif-3',
     type: 'payout',
     title: 'Livestock Sale Proceeds Distributed',
-    message: 'Success! Your matured Red Sokoto Goat has been successfully sold. The full purchase price plus growth profit has been credited to your wallet.',
+    message: 'Success! Your matured Red Sokoto Goat has been successfully sold. The full purchase price plus growth profit has been credited to your account.',
     date: '2026-06-29T09:00:00',
     read: true
   },
@@ -221,7 +146,7 @@ export const FAQS = [
   },
   {
     question: 'How do I receive my funds if I decide to sell my animal?',
-    answer: 'Upon maturity, you can choose to sell the animal through CowPlugNG. The full sales proceeds are paid directly into your CowPlugNG secure digital wallet. You can instantly withdraw directly to any verified Nigerian bank account (processed within 1-2 hours).'
+    answer: 'Upon maturity, you can choose to sell the animal through CowPlugNG. The full sales proceeds are paid directly into your CowPlugNG secure digital account. You can instantly withdraw directly to any verified Nigerian bank account (processed within 1-2 hours).'
   },
   {
     question: 'How do customers benefit from the platform?',

@@ -2,9 +2,10 @@ import { TrendingUp, Mail, Phone, MapPin, ShieldCheck, Heart, Github } from 'luc
 
 interface FooterProps {
   setActiveSection: (sec: string) => void;
+  onRegisterFarmer: () => void;
 }
 
-export default function Footer({ setActiveSection }: FooterProps) {
+export default function Footer({ setActiveSection, onRegisterFarmer }: FooterProps) {
   
   const handleLinkClick = (id: string) => {
     setActiveSection(id);
@@ -57,18 +58,23 @@ export default function Footer({ setActiveSection }: FooterProps) {
                 </button>
               </li>
               <li>
-                <button onClick={() => handleLinkClick('marketplace')} className="hover:text-emerald-400 transition-colors">
-                  Livestock Marketplace
-                </button>
-              </li>
-              <li>
                 <button onClick={() => handleLinkClick('meatsupply')} className="hover:text-emerald-400 transition-colors">
                   B2B Meat Supply Logistics
                 </button>
               </li>
               <li>
                 <button onClick={() => handleLinkClick('blog-faq')} className="hover:text-emerald-400 transition-colors">
-                  FAO & Industry Reports
+                  Blog & FAQ
+                </button>
+              </li>
+              <li>
+                <button onClick={() => handleLinkClick('contact')} className="hover:text-emerald-400 transition-colors">
+                  Contact Us
+                </button>
+              </li>
+              <li>
+                <button onClick={() => handleLinkClick('opportunities')} className="hover:text-emerald-400 transition-colors">
+                  Available Opportunities
                 </button>
               </li>
               <li>
@@ -109,7 +115,7 @@ export default function Footer({ setActiveSection }: FooterProps) {
             <span>•</span>
             <a href="#terms" className="hover:underline">Terms of Service</a>
             <span>•</span>
-            <a href="#sec" className="hover:underline">Secure Escrow Policy</a>
+            <a href="#sec" className="hover:underline">Secure Transaction Policy</a>
           </div>
 
           <p className="flex items-center">

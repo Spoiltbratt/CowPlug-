@@ -155,11 +155,14 @@ export default function InvoiceViewer({
   };
 
   const pendingList = userDynamicInvoices.filter(inv => 
-    inv.status === 'Pending Payment' || inv.status === 'Awaiting Verification' || inv.status === 'Rejected'
+    inv.status === 'Awaiting Invoice' || 
+    inv.status === 'Awaiting Payment' || 
+    inv.status === 'Awaiting Verification' || 
+    inv.status === 'Rejected'
   ).filter(matchesSearch);
 
   const ledgerList = [
-    ...userDynamicInvoices.filter(inv => inv.status === 'Paid' || inv.status === 'Verified'),
+    ...userDynamicInvoices.filter(inv => inv.status === 'Approved' || inv.status === 'Livestock Onboarded'),
     ...settledInvoices
   ].filter(matchesSearch);
 
@@ -309,8 +312,8 @@ export default function InvoiceViewer({
         </div>
       </div>
 
-      {/* Official bank transfer instruction banner for Pending Payment */}
-      {activeTab === 'pending' && pendingList.some(i => i.status === 'Pending Payment') && (
+      {/* Official bank transfer instruction banner for Awaiting Payment */}
+      {activeTab === 'pending' && pendingList.some(i => i.status === 'Awaiting Payment') && (
         <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 p-5 rounded-3xl space-y-3">
           <div className="flex items-center gap-2">
             <Building className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -319,7 +322,7 @@ export default function InvoiceViewer({
             </h4>
           </div>
           <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
-            Please make bank transfers to our accredited Escrow bank account below. Ensure you transfer the <strong>exact amount</strong>, and quote the <strong>Invoice ID</strong> as the transfer description/reference.
+            Please make bank transfers to our accredited bank account below. Ensure you transfer the <strong>exact amount</strong>, and quote the <strong>Invoice ID</strong> as the transfer description/reference.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white dark:bg-zinc-950 p-4 border rounded-2xl text-xs font-mono">
             <div>
@@ -332,7 +335,7 @@ export default function InvoiceViewer({
             </div>
             <div>
               <span className="text-[9px] text-zinc-400 block font-bold uppercase tracking-wide">ACCOUNT NAME</span>
-              <strong className="text-zinc-800 dark:text-zinc-200 font-sans text-sm">CowPlug Escrow Logistics Ltd</strong>
+              <strong className="text-zinc-800 dark:text-zinc-200 font-sans text-sm">CowPlug Logistics Ltd</strong>
             </div>
           </div>
         </div>
@@ -367,6 +370,8 @@ export default function InvoiceViewer({
                           {inv.invoiceNumber}
                         </strong>
                         <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+                          inv.status === 'Awaiting Invoice' ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' :
+                          inv.status === 'Awaiting Payment' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' :
                           inv.status === 'Awaiting Verification' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 animate-pulse' :
                           inv.status === 'Rejected' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400' :
                           'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
@@ -402,7 +407,11 @@ export default function InvoiceViewer({
                   </div>
 
                   <div className="flex gap-2">
-                    {inv.status === 'Pending Payment' || inv.status === 'Rejected' ? (
+                    {inv.status === 'Awaiting Invoice' ? (
+                      <div className="text-[11px] text-zinc-400 italic">
+                        Processing your sourcing request. We will generate your invoice shortly.
+                      </div>
+                    ) : inv.status === 'Awaiting Payment' || inv.status === 'Rejected' ? (
                       <button
                         onClick={() => openReceiptUploader(inv)}
                         className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center gap-1.5"
@@ -601,7 +610,7 @@ export default function InvoiceViewer({
                   <h3 className="font-display font-black text-sm text-zinc-900 dark:text-white uppercase tracking-wider">
                     Upload Bank Transfer Proof
                   </h3>
-                  <p className="text-[11px] text-zinc-500">Provide bank transaction logs to verify escrow wallet or animal payment.</p>
+                  <p className="text-[11px] text-zinc-500">Provide bank transaction logs to verify account or animal payment.</p>
                 </div>
                 <button
                   onClick={() => setUploaderInvoiceId(null)}

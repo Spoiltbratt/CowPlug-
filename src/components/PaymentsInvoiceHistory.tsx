@@ -72,7 +72,7 @@ export default function PaymentsInvoiceHistory({ ownedAnimals }: PaymentsInvoice
         date: cleanDate,
         expenseCategory: 'purchase',
         expenseName: `${animal.category} Acquisition`,
-        description: `Full purchase cost of ${animal.breed} (Tag: ${animal.tagNumber}) transferred directly to verified breeder escrow.`,
+        description: `Full purchase cost of ${animal.breed} (Tag: ${animal.tagNumber}) transferred directly to verified breeder.`,
         amount: basePrice,
         ledgerHash: `CPG-TX-${animal.tagNumber}-ACQ-${(basePrice).toString(16).toUpperCase()}`
       });
@@ -444,7 +444,7 @@ export default function PaymentsInvoiceHistory({ ownedAnimals }: PaymentsInvoice
                                       INVOICE REFERENCE: {item.invoiceNumber}
                                     </span>
                                     <span className="text-[8px] font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-zinc-900 px-1.5 py-0.5 rounded border border-emerald-500/10 uppercase">
-                                      ✓ Sourced via Wallet Escrow
+                                      ✓ Sourced via Account Balance
                                     </span>
                                   </div>
                                   <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">

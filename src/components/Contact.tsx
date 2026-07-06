@@ -198,20 +198,6 @@ export default function Contact() {
               </AnimatePresence>
             </div>
 
-            {/* Simulated Map Visual representation */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 relative overflow-hidden h-[180px] flex flex-col justify-end">
-              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]"></div>
-              
-              {/* Dot mapping pins */}
-              <div className="absolute top-1/2 left-1/3 h-4 w-4 bg-emerald-500 rounded-full animate-ping"></div>
-              <div className="absolute top-1/2 left-1/3 h-2 w-2 bg-emerald-500 rounded-full"></div>
-
-              <div className="relative z-10 bg-black/70 border border-zinc-800 p-3.5 rounded-2xl max-w-xs backdrop-blur-md">
-                <span className="text-[9px] text-amber-500 font-mono font-bold">LAGOS HEADQUARTER</span>
-                <p className="text-xs text-zinc-200 mt-0.5 font-sans">Lekki Phase 1, Lekki - Epe Expressway, Lagos State</p>
-              </div>
-            </div>
-
           </div>
 
         </div>

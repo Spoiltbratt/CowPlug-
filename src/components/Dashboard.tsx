@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Wallet, TrendingUp, Sparkles, Plus, AlertCircle, ArrowUpRight, ArrowDownLeft, 
+  CreditCard, TrendingUp, Sparkles, Plus, AlertCircle, ArrowUpRight, ArrowDownLeft, 
   CheckCircle2, FileText, Activity, ShieldCheck, HeartPulse, Calendar, 
   Syringe, Scale, Video, UserCheck, Play, Wheat, Truck, FileCheck, ShoppingBag, 
   Lock, ArrowRight, User, Award, Eye, Trash2, Mail, Phone, Info, Menu, X, LogOut,
-  Copy, Check, Image, Upload, Clock, ChevronRight
+  Copy, Check, Image, Upload, Clock, ChevronRight, Users, TreePine
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserType, AppNotification, FarmerLivestock } from '../types';
-import { Invoice } from '../types_payments';
+import { Invoice, BankDetails } from '../types_payments';
 import { Order } from './AdminOrderManagementCenterModal';
-import WeatherWidget from './WeatherWidget';
 import PricingPackages from './PricingPackages';
 import InvoiceViewer from './InvoiceViewer';
 import PaymentsInvoiceHistory from './PaymentsInvoiceHistory';
@@ -36,6 +35,7 @@ interface DashboardProps {
   onUpdateInvoice?: (id: string, updates: Partial<Invoice>) => void;
   orders?: Order[];
   onUpdateOrder?: (id: string, updates: Partial<Order>) => void;
+  companyBankDetails?: BankDetails;
 }
 
 export default function Dashboard({
@@ -58,6 +58,7 @@ export default function Dashboard({
   onUpdateInvoice = () => {},
   orders = [],
   onUpdateOrder = () => {},
+  companyBankDetails,
 }: DashboardProps) {
   
   // Navigation states
@@ -92,28 +93,16 @@ export default function Dashboard({
     localStorage.setItem('cp_sourcing_requests', JSON.stringify(sourcingRequests));
   }, [sourcingRequests]);
 
-  // Wallet states
-  const [fundAmount, setFundAmount] = useState<string>('50000');
-  const [fundSuccess, setFundSuccess] = useState(false);
-  
-  // Manual Transfer states
-  const [transferBank, setTransferBank] = useState('GTBank');
-  const [transferRef, setTransferRef] = useState('');
-  const [transferReceiptName, setTransferReceiptName] = useState('');
-  const [transferReceiptPreview, setTransferReceiptPreview] = useState<string | null>(null);
-  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
-  const [transferSuccess, setTransferSuccess] = useState(false);
-
-  const [withdrawAmount, setWithdrawAmount] = useState<string>('25000');
-  const [bankName, setBankName] = useState('GTBank');
-  const [accountNumber, setAccountNumber] = useState('0124589341');
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
   // Sourcing form states
   const [srcCategory, setSrcCategory] = useState<'Cow' | 'Goat' | 'Ram'>('Cow');
   const [srcBreed, setSrcBreed] = useState('White Fulani');
   const [srcQty, setSrcQty] = useState(1);
-  const [srcPurpose, setSrcPurpose] = useState('Wedding Sourcing');
+  const [srcBudget, setSrcBudget] = useState('');
+  const [srcPackage, setSrcPackage] = useState('Pasture Only');
+  const [srcDelivery, setSrcDelivery] = useState('Farm Pickup');
+  const [srcPurpose, setSrcPurpose] = useState('Personal Consumption');
   const [srcSuccess, setSrcSuccess] = useState(false);
 
   // Delivery form states
@@ -168,97 +157,25 @@ export default function Dashboard({
   const menuItems = isCustomer ? [
     { id: 'dashboard', name: 'Dashboard', icon: Activity },
     { id: 'my-livestock', name: 'My Livestock', icon: HeartPulse },
-    { id: 'marketplace', name: 'Marketplace', icon: ShoppingBag, action: () => setActiveSection('marketplace') },
     { id: 'request-livestock', name: 'Request Sourcing', icon: Plus },
-    { id: 'payments', name: 'Payments & Wallet', icon: Wallet },
-    { id: 'invoices', name: 'Transparent Invoices', icon: FileText },
-    { id: 'health-records', name: 'Health Records', icon: Syringe },
+    { id: 'payments', name: 'My Invoices', icon: FileText },
     { id: 'feeding-plans', name: 'Feeding Plans', icon: Wheat },
     { id: 'delivery-requests', name: 'Delivery Requests', icon: Truck },
-    { id: 'profile', name: 'My Profile', icon: User },
   ] : isSeller ? [
     { id: 'dashboard', name: 'Dashboard', icon: Activity },
     { id: 'my-listings', name: 'Manage Herd', icon: FileCheck },
     { id: 'orders', name: 'Customer Orders', icon: ShoppingBag },
     { id: 'sales', name: 'Sales & Revenue', icon: TrendingUp },
-    { id: 'payments', name: 'Payments', icon: Wallet },
-    { id: 'profile', name: 'Farm Profile', icon: User },
+    { id: 'payments', name: 'Payments', icon: CreditCard },
   ] : [
     { id: 'dashboard', name: 'Dashboard Overview', icon: Activity },
     { id: 'notifications', name: 'Dispatch Alerts', icon: Syringe },
     { id: 'registry', name: 'Global Registry', icon: FileCheck },
   ];
 
-  // Handle wallet transactions
-  const handleFund = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amt = parseFloat(fundAmount);
-    if (amt > 0 && currentUser) {
-      setIsSubmittingTransfer(true);
-      
-      const newInvoiceId = `inv-${Date.now()}`;
-      const newInvoice: Invoice = {
-        id: newInvoiceId,
-        invoiceNumber: `INV-${Date.now()}`,
-        customerEmail: currentUser.email,
-        customerFullName: currentUser.fullName,
-        customerId: currentUser.id || currentUser.email,
-        amount: amt,
-        date: new Date().toISOString(),
-        status: 'Awaiting Verification',
-        paymentReference: transferRef || `TXN-${Date.now().toString().substring(5)}`,
-        bankUsed: transferBank,
-        receiptUrl: transferReceiptName || 'receipt_screenshot.png',
-        paymentDate: new Date().toISOString(),
-        internalNotes: 'Pending verification of bank transfer',
-        auditLog: [
-          {
-            date: new Date().toISOString(),
-            status: 'Awaiting Verification',
-            actionBy: currentUser.fullName,
-            notes: `Manual bank transfer proof submitted. Sender bank: ${transferBank}, Ref: ${transferRef || 'N/A'}`
-          }
-        ]
-      };
-      
-      onAddInvoice(newInvoice);
-      
-      onDispatchNotification({
-        id: `notif-transfer-${Date.now()}`,
-        type: 'system',
-        title: '₦ Transfer Proof Received',
-        message: `Manual transfer of ₦${amt.toLocaleString()} submitted for review. Ref: ${newInvoice.paymentReference}`,
-        date: new Date().toISOString(),
-        read: false
-      });
-
-      setIsSubmittingTransfer(false);
-      setTransferSuccess(true);
-      
-      // Clear form fields
-      setTransferRef('');
-      setTransferReceiptName('');
-      setTransferReceiptPreview(null);
-      
-      setTimeout(() => setTransferSuccess(false), 5000);
-    }
-  };
-
   // Drag and Drop & File Upload handlers
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [selectedHistoryInvoice, setSelectedHistoryInvoice] = useState<Invoice | null>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setTransferReceiptName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTransferReceiptPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -274,32 +191,7 @@ export default function Dashboard({
     setIsDraggingFile(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      setTransferReceiptName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTransferReceiptPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleWithdraw = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amt = parseFloat(withdrawAmount);
-    if (amt > 0 && amt <= userBalance) {
-      onWithdrawBalance(amt);
-      setWithdrawSuccess(true);
-      onDispatchNotification({
-        id: `notif-with-${Date.now()}`,
-        type: 'system',
-        title: '₦ Payout Settled',
-        message: `Withdrew ₦${amt.toLocaleString()} to ${bankName} (${accountNumber})`,
-        date: new Date().toISOString(),
-        read: false
-      });
-      setTimeout(() => setWithdrawSuccess(false), 3000);
-    } else {
-      alert('Insufficient wallet funds.');
+      // Manual receipt upload logic should be in InvoiceViewer
     }
   };
 
@@ -308,24 +200,68 @@ export default function Dashboard({
     e.preventDefault();
     const newReq = {
       id: `src-${Date.now()}`,
+      investorId: currentUser.id,
+      investorName: currentUser.fullName,
       category: srcCategory,
       breed: srcBreed,
       quantity: srcQty,
-      purpose: srcPurpose,
-      status: 'Processing',
+      budget: parseFloat(srcBudget) || 0,
+      feedingPackage: srcPackage,
+      deliveryPreference: srcDelivery,
+      intendedPurpose: srcPurpose,
+      status: 'Awaiting Invoice',
       date: new Date().toISOString().split('T')[0]
     };
+
+    // Also create a linked Invoice object for the billing workflow
+    const newInvoice: Invoice = {
+      id: `inv-${Date.now()}`,
+      invoiceNumber: `SRC-${Date.now().toString().substring(7)}`,
+      customerId: currentUser.id,
+      customerEmail: currentUser.email,
+      customerFullName: currentUser.fullName,
+      amount: parseFloat(srcBudget) || 0, // Initial estimate or 0 if not provided
+      date: new Date().toISOString(),
+      status: 'Awaiting Invoice',
+      animalType: srcCategory as any,
+      breed: srcBreed,
+      quantity: srcQty,
+      reservedTag: 'TBD',
+      feedingPackage: {
+        name: srcPackage,
+        monthlyCost: 0, // To be determined by Admin
+        veterinaryCoverage: 'Standard',
+        managementServices: 'Range Boarding',
+        duration: 'Indefinite'
+      },
+      auditLog: [
+        {
+          date: new Date().toISOString(),
+          status: 'Awaiting Invoice',
+          actionBy: currentUser.fullName,
+          notes: 'Sourcing request submitted by investor.'
+        }
+      ]
+    };
+
     setSourcingRequests(prev => [newReq, ...prev]);
+    onAddInvoice(newInvoice);
     setSrcSuccess(true);
     onDispatchNotification({
       id: `notif-src-${Date.now()}`,
       type: 'system',
-      title: '📋 Custom Sourcing Received',
-      message: `CowPlugNG agents are sourcing ${srcQty} x healthy ${srcCategory} (${srcBreed}) for you.`,
+      title: '📋 Sourcing Request Logged',
+      message: `Your request for ${srcQty} x ${srcCategory} has been sent to Admin for review and invoice generation.`,
       date: new Date().toISOString(),
       read: false
     });
-    setTimeout(() => setSrcSuccess(false), 3000);
+    
+    // Clear form
+    setSrcBudget('');
+    setSrcQty(1);
+    setSrcBreed('White Fulani');
+    
+    setTimeout(() => setSrcSuccess(false), 5000);
   };
 
   // Handle Delivery request
@@ -461,8 +397,8 @@ export default function Dashboard({
         </div>
         <div className="flex items-center space-x-3">
           <div className="text-right">
-            <p className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-500/10">
-              ₦{userBalance.toLocaleString()}
+            <p className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-500/10 uppercase">
+              Manual Payments Only
             </p>
           </div>
           <img src={currentUser.avatar} alt={currentUser.fullName} className="h-7 w-7 rounded-full border border-emerald-500 object-cover" />
@@ -521,11 +457,7 @@ export default function Dashboard({
                       key={item.id}
                       onClick={() => {
                         setMobileSidebarOpen(false);
-                        if (item.action) {
-                          item.action();
-                        } else {
-                          setActiveMenuTab(item.id);
-                        }
+                        setActiveMenuTab(item.id);
                       }}
                       className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                         isActive 
@@ -596,11 +528,7 @@ export default function Dashboard({
                 <button
                   key={item.id}
                   onClick={() => {
-                    if (item.action) {
-                      item.action();
-                    } else {
-                      setActiveMenuTab(item.id);
-                    }
+                    setActiveMenuTab(item.id);
                   }}
                   className={`w-full flex items-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
                     isActive 
@@ -659,13 +587,9 @@ export default function Dashboard({
                        </div>
                      </div>
 
+
                      {/* Stats Grid */}
                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                       <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                         <span className="text-[10px] text-zinc-400 font-bold uppercase">Digital Wallet Balance</span>
-                         <strong className="text-lg text-emerald-600 dark:text-emerald-400 font-mono block mt-1">₦{userBalance.toLocaleString()}</strong>
-                         <span className="text-[9px] text-zinc-400">Secure digital escrow</span>
-                       </div>
                        <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
                          <span className="text-[10px] text-zinc-400 font-bold uppercase">Managed Livestock</span>
                          <strong className="text-lg text-zinc-900 dark:text-white block mt-1">{ownedAnimals.length} Active Head</strong>
@@ -699,9 +623,7 @@ export default function Dashboard({
                      {ownedAnimals.length === 0 ? (
                        <div className="p-6 text-center border-2 border-dashed border-zinc-100 dark:border-zinc-800 rounded-xl space-y-2">
                          <p className="text-xs text-zinc-500">You don't own any active livestock registers yet.</p>
-                         <button onClick={() => setActiveSection('marketplace')} className="px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700">
-                           Browse Marketplace
-                         </button>
+                         {/* Marketplace button removed */}
                        </div>
                      ) : (
                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -720,53 +642,6 @@ export default function Dashboard({
                              </div>
                            </div>
                          ))}
-                       </div>
-                     )}
-                   </div>
-
-                   {/* 3. Active Packages */}
-                   <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
-                     <div>
-                       <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Active Packages</h4>
-                       <p className="text-[11px] text-zinc-500 mt-0.5">Management, pasture feeding, and wellness packages active for your herd</p>
-                     </div>
-
-                     {ownedAnimals.length === 0 ? (
-                       <p className="text-xs text-zinc-500">No active packages enrolled (No active livestock owned).</p>
-                     ) : (
-                       <div className="space-y-3">
-                         {ownedAnimals.map((animal) => {
-                           const plan = animal.feedingPlan || 'Pasture Only';
-                           let packageDesc = 'Standard continuous grazing on public range pasture C.';
-                           let cost = '₦15,000 / mo';
-                           if (plan.includes('Supplement')) {
-                             packageDesc = 'Pasture grazing with supplementary professional nutrient-dense silage feed rations.';
-                             cost = '₦30,750 / mo';
-                           } else if (plan.includes('Fattening')) {
-                             packageDesc = 'Intense high-protein fattening concentrates for accelerated growth and rapid mass development.';
-                             cost = '₦35,750 / mo';
-                           }
-                           return (
-                             <div key={animal.id} className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-850 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                               <div className="flex items-start space-x-3">
-                                 <span className="text-xl mt-0.5">📦</span>
-                                 <div>
-                                   <div className="flex items-center space-x-2">
-                                     <h5 className="text-xs font-bold text-zinc-800 dark:text-white">{plan}</h5>
-                                     <span className="text-[9px] font-mono text-zinc-400">For {animal.tagNumber}</span>
-                                   </div>
-                                   <p className="text-[10px] text-zinc-500 mt-0.5">{packageDesc}</p>
-                                 </div>
-                               </div>
-                               <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-0 pt-2 sm:pt-0 border-zinc-100 dark:border-zinc-800">
-                                 <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">{cost}</span>
-                                 <button onClick={() => { setActiveMenuTab('feeding-plans'); setSelectedOwnerAnimalId(animal.id); }} className="px-2.5 py-1 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-[10px] font-bold hover:bg-emerald-600 hover:text-white transition-colors">
-                                   Manage
-                                 </button>
-                               </div>
-                             </div>
-                           );
-                         })}
                        </div>
                      )}
                    </div>
@@ -867,73 +742,36 @@ export default function Dashboard({
                      </div>
                    </div>
 
-                   {/* 6. Pending Payments */}
-                   <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
-                     <div className="flex justify-between items-center">
-                       <div>
-                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pending Payments</h4>
-                         <p className="text-[11px] text-zinc-500 mt-0.5">Invoices or recurring subscriptions requiring clearance</p>
-                       </div>
-                       <span className="text-xs bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300 px-2 py-0.5 rounded-full font-bold">
-                         0 Pending
-                       </span>
-                     </div>
+                    {/* 6. Active Sourcing Requests */}
+                    <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Sourcing Logs</h4>
+                          <p className="text-[11px] text-zinc-500 mt-0.5">Tracking your livestock sourcing requests</p>
+                        </div>
+                        <span className="text-xs bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                          {sourcingRequests.length} Active
+                        </span>
+                      </div>
 
-                     <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-xl text-center">
-                       <span className="text-emerald-600 text-base">✓</span>
-                       <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 mt-1">All accounts are in good standing! No pending invoices or overdue feed logs.</p>
-                       <button onClick={() => setActiveMenuTab('payments')} className="mt-2 text-[10px] font-bold text-emerald-600 hover:underline">
-                         Fund Secure Escrow Wallet →
-                       </button>
-                     </div>
-                   </div>
-
-                   {/* 7. Recent Transactions */}
-                   <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
-                     <div className="flex justify-between items-center">
-                       <div>
-                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Recent Transactions</h4>
-                         <p className="text-[11px] text-zinc-500 mt-0.5">Escrow audit trail logs</p>
-                       </div>
-                       <button onClick={() => setActiveMenuTab('payments')} className="text-[10px] font-bold text-emerald-600 hover:underline">
-                         View All
-                       </button>
-                     </div>
-
-                     <div className="space-y-3.5 text-xs">
-                       {[
-                         {
-                           type: "Wallet Credit",
-                           desc: "Direct escrow deposit approved",
-                           amount: "+₦500,000",
-                           time: "July 01, 2026",
-                           status: "Completed",
-                           isCredit: true
-                         },
-                         {
-                           type: "Livestock Purchase",
-                           desc: "White Fulani Cow acquisition",
-                           amount: "-₦350,000",
-                           time: "June 25, 2026",
-                           status: "Completed",
-                           isCredit: false
-                         }
-                       ].map((tx, idx) => (
-                         <div key={idx} className="flex justify-between items-center pb-2.5 last:pb-0 border-b last:border-0 border-zinc-100 dark:border-zinc-800">
-                           <div>
-                             <p className="font-bold text-zinc-800 dark:text-zinc-200">{tx.type}</p>
-                             <p className="text-[10px] text-zinc-400">{tx.desc} • {tx.time}</p>
-                           </div>
-                           <div className="text-right shrink-0">
-                             <span className={`font-mono font-bold block ${tx.isCredit ? 'text-emerald-600' : 'text-zinc-700 dark:text-white'}`}>
-                               {tx.amount}
-                             </span>
-                             <span className="text-[9px] text-zinc-400">{tx.status}</span>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
+                      <div className="space-y-2">
+                        {sourcingRequests.length === 0 ? (
+                          <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-xl text-center">
+                            <p className="text-xs text-zinc-500">No active sourcing requests.</p>
+                          </div>
+                        ) : (
+                          sourcingRequests.slice(0, 2).map((req, i) => (
+                            <div key={i} className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-850 flex items-center justify-between text-xs">
+                              <div>
+                                <p className="font-bold">{req.quantity} x {req.category}</p>
+                                <p className="text-[10px] text-zinc-400">{req.breed} • {req.status}</p>
+                              </div>
+                              <button onClick={() => setActiveMenuTab('request-livestock')} className="text-emerald-600 font-bold hover:underline">Track</button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
 
                    {/* 8. Notifications */}
                    <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
@@ -971,58 +809,8 @@ export default function Dashboard({
                      </div>
                    </div>
 
-                   {/* 9. Marketplace Suggestions */}
-                   <div className="p-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl space-y-4">
-                     <div className="flex justify-between items-center">
-                       <div>
-                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Marketplace Suggestions</h4>
-                         <p className="text-[11px] text-zinc-500 mt-0.5">Top performing breeds recommended for Oyo region boarding</p>
-                       </div>
-                       <button onClick={() => setActiveSection('marketplace')} className="text-[10px] font-bold text-emerald-600 hover:underline">
-                         Explore Shop
-                       </button>
-                     </div>
 
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       {[
-                         {
-                           name: "White Fulani Cow",
-                           desc: "High heat tolerance, premium beef yielding, fully vaccinated",
-                           price: "₦350,000",
-                           yield: "Accruing weight logs daily"
-                         },
-                         {
-                           name: "Kalahari Red Goat",
-                           desc: "Excellent parasite resistance, high fecundity breeders",
-                           price: "₦85,000",
-                           yield: "High reproduction rates"
-                         }
-                       ].map((sug, idx) => (
-                         <div key={idx} className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-150 dark:border-zinc-850 space-y-2 text-xs flex flex-col justify-between">
-                           <div>
-                             <h5 className="font-bold text-zinc-800 dark:text-white">{sug.name}</h5>
-                             <p className="text-[10px] text-zinc-500 mt-0.5">{sug.desc}</p>
-                             <span className="text-[9px] text-emerald-600 font-mono font-bold mt-1.5 block">✓ {sug.yield}</span>
-                           </div>
-                           <div className="flex justify-between items-center border-t border-zinc-100 dark:border-zinc-800 pt-2 mt-2">
-                             <span className="font-mono font-bold text-zinc-900 dark:text-white">{sug.price}</span>
-                             <button onClick={() => setActiveSection('marketplace')} className="px-2 py-1 bg-emerald-600 text-white text-[9px] font-bold rounded hover:bg-emerald-700">
-                               Acquire
-                             </button>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
 
-                   {/* 10. Pasture Weather & Climate Widget */}
-                   <div className="space-y-3">
-                     <div className="px-1">
-                       <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pasture Weather & Climate Widget</h4>
-                       <p className="text-[11px] text-zinc-500 mt-0.5">Live grazing environmental simulation metrics at Oyo Pasture Range C</p>
-                     </div>
-                     <WeatherWidget defaultLocation="Oyo, Nigeria" ranchName="Oyo Pasture Range C" />
-                   </div>
                  </div>
                )}
 
@@ -1042,8 +830,8 @@ export default function Dashboard({
                     <div className="text-center py-16 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
                       <span className="text-3xl">🐄</span>
                       <p className="text-xs font-bold text-zinc-400 mt-3">You do not own any active livestock registers.</p>
-                      <button onClick={() => setActiveSection('marketplace')} className="mt-4 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl">
-                        Purchase in Marketplace
+                      <button onClick={() => {}} className="mt-4 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl">
+                        Purchase in Catalog
                       </button>
                     </div>
                   ) : (
@@ -1158,34 +946,23 @@ export default function Dashboard({
                   </div>
 
                   <form onSubmit={handleSourcingRequest} className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Livestock Category</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['Cow', 'Goat', 'Ram'] as const).map(cat => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setSrcCategory(cat)}
-                            className={`p-2 rounded-xl border text-xs font-bold transition-all ${
-                              srcCategory === cat ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-transparent'
-                            }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Breed preference</label>
-                        <input
-                          type="text"
-                          required
-                          value={srcBreed}
-                          onChange={(e) => setSrcBreed(e.target.value)}
-                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
-                        />
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Livestock Category</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['Cow', 'Goat', 'Ram'] as const).map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setSrcCategory(cat)}
+                              className={`p-2 rounded-xl border text-xs font-bold transition-all ${
+                                srcCategory === cat ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-transparent'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Required quantity</label>
@@ -1200,6 +977,56 @@ export default function Dashboard({
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Preferred breed</label>
+                        <input
+                          type="text"
+                          required
+                          value={srcBreed}
+                          onChange={(e) => setSrcBreed(e.target.value)}
+                          placeholder="e.g. White Fulani"
+                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Budget (Optional)</label>
+                        <input
+                          type="number"
+                          value={srcBudget}
+                          onChange={(e) => setSrcBudget(e.target.value)}
+                          placeholder="e.g. 450000"
+                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Feeding Package</label>
+                        <select
+                          value={srcPackage}
+                          onChange={(e) => setSrcPackage(e.target.value)}
+                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
+                        >
+                          <option value="Pasture Only">Pasture Only</option>
+                          <option value="Pasture + Supplement">Pasture + Supplement</option>
+                          <option value="Premium Fattening">Premium Fattening</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Delivery Preference</label>
+                        <select
+                          value={srcDelivery}
+                          onChange={(e) => setSrcDelivery(e.target.value)}
+                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
+                        >
+                          <option value="Farm Pickup">Farm Pickup</option>
+                          <option value="CowPlug Logistics">CowPlug Logistics Delivery</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Intended Purpose</label>
                       <select
@@ -1207,14 +1034,14 @@ export default function Dashboard({
                         onChange={(e) => setSrcPurpose(e.target.value)}
                         className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
                       >
+                        <option value="Personal Consumption">Personal Consumption</option>
                         <option value="Wedding Sourcing">Wedding Sourcing</option>
                         <option value="Festival Sourcing">Festival / Sallah Sourcing</option>
                         <option value="Business supply">Business / Meat Supply</option>
-                        <option value="Personal Consumption">Personal consumption</option>
                       </select>
                     </div>
 
-                    <button type="submit" className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold">
+                    <button type="submit" className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-700/20">
                       Submit Sourcing Request
                     </button>
                   </form>
@@ -1243,444 +1070,8 @@ export default function Dashboard({
                 </div>
               )}
 
-              {/* Tab 4: Payments & Wallet */}
+              {/* Tab 4: My Invoices */}
               {activeMenuTab === 'payments' && (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* Manual Bank Transfer & Receipt Upload Form */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-5">
-                      <div className="space-y-1">
-                        <h3 className="font-bold text-md text-zinc-900 dark:text-white flex items-center gap-1.5">
-                          <Wallet className="h-4 w-4 text-emerald-600" />
-                          Fund Escrow Wallet via Transfer
-                        </h3>
-                        <p className="text-[11px] text-zinc-400">
-                          Transfer funds to the secure escrow bank account below, then upload your receipt screenshot.
-                        </p>
-                      </div>
-
-                      {/* Bank Details Card */}
-                      <div className="bg-zinc-50 dark:bg-zinc-950 p-4 rounded-xl border border-zinc-150 dark:border-zinc-850 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Escrow Bank Details</span>
-                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/10">
-                            Instant Verification Pool
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div>
-                            <span className="text-[10px] text-zinc-400 block font-normal">Bank Name</span>
-                            <span className="font-bold text-zinc-800 dark:text-zinc-200">Sterling Bank Plc</span>
-                          </div>
-                          <div>
-                            <span className="text-[10px] text-zinc-400 block font-normal">Account Name</span>
-                            <span className="font-bold text-zinc-800 dark:text-zinc-200 truncate block" title="CowPlug Nigeria Ltd (Escrow Account)">
-                              CowPlug Ltd (Escrow Account)
-                            </span>
-                          </div>
-                        </div>
-                        <div className="pt-2 border-t dark:border-zinc-850 flex items-center justify-between gap-2">
-                          <div>
-                            <span className="text-[10px] text-zinc-400 block font-normal">Account Number</span>
-                            <span className="font-mono font-bold text-sm text-zinc-900 dark:text-white tracking-wider">
-                              0092817261
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText('0092817261');
-                              alert('Sterling bank account number 0092817261 copied to clipboard!');
-                            }}
-                            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-850 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold"
-                          >
-                            <Copy className="h-3.5 w-3.5" /> Copy
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Manual Transfer details Form */}
-                      <form onSubmit={handleFund} className="space-y-4 text-xs">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                              Amount Transferred (₦)
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              min="1000"
-                              placeholder="e.g. 50000"
-                              value={fundAmount}
-                              onChange={(e) => setFundAmount(e.target.value)}
-                              className="w-full px-3.5 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono focus:outline-none focus:border-emerald-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                              Your Bank Name (Sender)
-                            </label>
-                            <select
-                              value={transferBank}
-                              onChange={(e) => setTransferBank(e.target.value)}
-                              className="w-full px-3.5 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 focus:outline-none focus:border-emerald-500"
-                            >
-                              <option value="GTBank">GTBank</option>
-                              <option value="Access Bank">Access Bank</option>
-                              <option value="Zenith Bank">Zenith Bank</option>
-                              <option value="Sterling Bank">Sterling Bank</option>
-                              <option value="UBA">UBA (United Bank for Africa)</option>
-                              <option value="Fidelity Bank">Fidelity Bank</option>
-                              <option value="First Bank">First Bank of Nigeria</option>
-                              <option value="Kuda Bank">Kuda Microfinance Bank</option>
-                              <option value="OPay">OPay</option>
-                              <option value="Palmpay">Palmpay</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                            Transaction Reference Number
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="e.g. 202607051234567890"
-                            value={transferRef}
-                            onChange={(e) => setTransferRef(e.target.value)}
-                            className="w-full px-3.5 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono focus:outline-none focus:border-emerald-500"
-                          />
-                        </div>
-
-                        {/* Interactive Receipt screenshot upload space */}
-                        <div className="space-y-1">
-                          <label className="block text-[10px] font-bold text-zinc-400 uppercase">
-                            Upload Receipt Screenshot
-                          </label>
-                          <div
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
-                            className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
-                              isDraggingFile 
-                                ? 'border-emerald-500 bg-emerald-50/20' 
-                                : transferReceiptPreview 
-                                ? 'border-emerald-500 bg-emerald-500/5' 
-                                : 'border-zinc-200 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700'
-                            }`}
-                            onClick={() => document.getElementById('receipt-upload-input')?.click()}
-                          >
-                            <input
-                              type="file"
-                              id="receipt-upload-input"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleFileChange}
-                            />
-                            
-                            {transferReceiptPreview ? (
-                              <div className="flex items-center gap-3 text-left">
-                                <div className="h-12 w-12 bg-zinc-100 rounded border overflow-hidden shrink-0 flex items-center justify-center">
-                                  <img 
-                                    src={transferReceiptPreview} 
-                                    alt="Receipt Preview" 
-                                    className="h-full w-full object-cover"
-                                    referrerPolicy="no-referrer"
-                                  />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-bold text-zinc-800 dark:text-zinc-200 truncate text-[11px]">
-                                    {transferReceiptName || 'receipt_screenshot.png'}
-                                  </p>
-                                  <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5">
-                                    <Check className="h-3 w-3" /> Ready to upload
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTransferReceiptName('');
-                                    setTransferReceiptPreview(null);
-                                  }}
-                                  className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-850 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="space-y-1 text-zinc-400 dark:text-zinc-500">
-                                <Upload className="h-5 w-5 mx-auto text-zinc-400" />
-                                <p className="font-bold text-[10px]">
-                                  {isDraggingFile ? 'Drop file here' : 'Drag & drop payment receipt image, or browse'}
-                                </p>
-                                <p className="text-[9px]">Supports PNG, JPG, JPEG • Max 5MB</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <button 
-                          type="submit" 
-                          disabled={isSubmittingTransfer}
-                          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                        >
-                          {isSubmittingTransfer ? 'Submitting Receipt...' : 'Submit Payment Proof'}
-                        </button>
-                      </form>
-                      {transferSuccess && (
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 rounded-xl text-center text-xs font-bold animate-fade-in flex items-center justify-center gap-1">
-                          <CheckCircle2 className="h-4 w-4" /> Proof submitted successfully! Verification is pending.
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Withdraw form */}
-                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
-                      <h3 className="font-bold text-md text-zinc-900 dark:text-white">Withdraw to Local Bank</h3>
-                      <form onSubmit={handleWithdraw} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Amount (₦)</label>
-                            <input
-                              type="number"
-                              required
-                              value={withdrawAmount}
-                              onChange={(e) => setWithdrawAmount(e.target.value)}
-                              className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Select Bank</label>
-                            <input
-                              type="text"
-                              required
-                              value={bankName}
-                              onChange={(e) => setBankName(e.target.value)}
-                              className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Account Number</label>
-                          <input
-                            type="text"
-                            required
-                            maxLength={10}
-                            value={accountNumber}
-                            onChange={(e) => setAccountNumber(e.target.value)}
-                            className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono"
-                          />
-                        </div>
-                        <button type="submit" className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold">
-                          Request Payout Withdrawal
-                        </button>
-                      </form>
-                      {withdrawSuccess && (
-                        <p className="text-xs text-emerald-600 text-center font-bold">Payout settled successfully!</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Escrow Funding & Manual Transfer History */}
-                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 space-y-4">
-                    <div className="border-b dark:border-zinc-800 pb-3 flex justify-between items-center flex-wrap gap-2">
-                      <div>
-                        <h3 className="font-bold text-sm text-zinc-900 dark:text-white flex items-center gap-1.5">
-                          <Clock className="h-4 w-4 text-emerald-600" />
-                          Escrow Funding & Transfer History
-                        </h3>
-                        <p className="text-xs text-zinc-400 mt-0.5">
-                          Track your manual bank transfer uploads and receipt verification statuses.
-                        </p>
-                      </div>
-                      <span className="text-[10px] bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded font-mono text-zinc-500 dark:text-zinc-400 font-bold">
-                        Total Submissions: {invoices.filter(i => i.customerEmail.toLowerCase() === currentUser?.email.toLowerCase()).length}
-                      </span>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800">
-                            <th className="p-3 pl-4">Invoice / Ref</th>
-                            <th className="p-3">Sender Bank</th>
-                            <th className="p-3">Amount</th>
-                            <th className="p-3">Date Submitted</th>
-                            <th className="p-3">Verification Status</th>
-                            <th className="p-3 text-right pr-4">Receipt Screenshot</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y dark:divide-zinc-800">
-                          {invoices.filter(i => i.customerEmail.toLowerCase() === currentUser?.email.toLowerCase()).length === 0 ? (
-                            <tr>
-                              <td colSpan={6} className="p-8 text-center text-zinc-400 dark:text-zinc-500 font-normal">
-                                <FileText className="h-6 w-6 text-zinc-300 dark:text-zinc-700 mx-auto mb-1.5" />
-                                No transfer receipts uploaded yet. Use the transfer panel above to submit your receipt screenshot.
-                              </td>
-                            </tr>
-                          ) : (
-                            invoices
-                              .filter(i => i.customerEmail.toLowerCase() === currentUser?.email.toLowerCase())
-                              .map(inv => (
-                                <tr key={inv.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20 transition-colors">
-                                  <td className="p-3 pl-4 font-mono">
-                                    <div className="font-bold text-zinc-700 dark:text-zinc-300">
-                                      INV-{inv.id.replace('inv-', '').substring(0, 8).toUpperCase()}
-                                    </div>
-                                    <div className="text-[10px] text-zinc-400 truncate max-w-[120px]" title={inv.paymentReference}>
-                                      Ref: {inv.paymentReference || 'N/A'}
-                                    </div>
-                                  </td>
-                                  <td className="p-3">
-                                    <span className="font-medium text-zinc-600 dark:text-zinc-400">
-                                      {inv.bankUsed || 'Sterling Bank'}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 font-bold text-zinc-900 dark:text-white">
-                                    ₦{inv.amount.toLocaleString()}
-                                  </td>
-                                  <td className="p-3 text-zinc-500">
-                                    {new Date(inv.date).toLocaleDateString()}
-                                  </td>
-                                  <td className="p-3">
-                                    <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                      inv.status === 'Paid' || inv.status === 'Verified' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-800' :
-                                      inv.status === 'Awaiting Verification' ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-800 animate-pulse' :
-                                      inv.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-800' :
-                                      'bg-zinc-50 text-zinc-500 border border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
-                                    }`}>
-                                      {inv.status === 'Paid' ? 'Verified & Funded' : inv.status}
-                                    </span>
-                                    {inv.internalNotes && inv.status === 'Rejected' && (
-                                      <span className="block text-[9px] text-red-500 font-medium mt-0.5">
-                                        Reason: {inv.internalNotes}
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="p-3 text-right pr-4">
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedHistoryInvoice(inv)}
-                                      className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer"
-                                    >
-                                      <Image className="h-3.5 w-3.5" /> View Receipt
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Detailed Interactive Sourcing Invoices List with sorting & filtering */}
-                  <PaymentsInvoiceHistory ownedAnimals={ownedAnimals} />
-
-                  {/* Receipt Lightbox Modal Overlay */}
-                  <AnimatePresence>
-                    {selectedHistoryInvoice && (
-                      <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-md w-full p-6 shadow-xl relative space-y-4"
-                        >
-                          <button
-                            onClick={() => setSelectedHistoryInvoice(null)}
-                            className="absolute right-4 top-4 p-1 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-
-                          <div className="space-y-1 pr-6 text-left">
-                            <h4 className="font-bold text-sm text-zinc-900 dark:text-white">
-                              Bank Transfer Receipt Screenshot
-                            </h4>
-                            <p className="text-[10px] font-mono text-zinc-400">
-                              Invoice ID: INV-{selectedHistoryInvoice.id.replace('inv-', '').substring(0, 8).toUpperCase()}
-                            </p>
-                          </div>
-
-                          {/* Image Render */}
-                          <div className="border border-zinc-150 dark:border-zinc-800 rounded-xl overflow-hidden bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center aspect-video relative">
-                            {selectedHistoryInvoice.receiptUrl && selectedHistoryInvoice.receiptUrl.startsWith('data:image') ? (
-                              <img 
-                                src={selectedHistoryInvoice.receiptUrl} 
-                                alt="Uploaded Proof of Payment" 
-                                className="max-h-full max-w-full object-contain"
-                                referrerPolicy="no-referrer"
-                              />
-                            ) : (
-                              <div className="p-6 text-center text-zinc-400 space-y-2">
-                                <Image className="h-8 w-8 mx-auto text-zinc-300 dark:text-zinc-700" />
-                                <div className="text-[11px] font-bold text-zinc-500">
-                                  {selectedHistoryInvoice.receiptUrl || 'receipt_screenshot.png'}
-                                </div>
-                                <div className="text-[9px] text-zinc-400 font-normal max-w-xs mx-auto">
-                                  Receipt verified successfully. In a live system, this displays the uploaded proof of payment screenshot or document.
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Details list */}
-                          <div className="bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-xl border border-zinc-150 dark:border-zinc-800 text-xs space-y-2 text-left">
-                            <div className="flex justify-between">
-                              <span className="text-zinc-400">Amount Transferred:</span>
-                              <span className="font-bold text-zinc-900 dark:text-white font-mono">
-                                ₦{selectedHistoryInvoice.amount.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-zinc-400">Sender Bank Used:</span>
-                              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                                {selectedHistoryInvoice.bankUsed || 'Sterling Bank'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between flex-col sm:flex-row sm:gap-2">
-                              <span className="text-zinc-400">Transaction Ref:</span>
-                              <span className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 break-all text-right">
-                                {selectedHistoryInvoice.paymentReference || 'TXN-UNKNOWN'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-zinc-400">Submission Date:</span>
-                              <span className="text-zinc-600 dark:text-zinc-400 font-mono text-[11px]">
-                                {new Date(selectedHistoryInvoice.date).toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-zinc-400">Current Status:</span>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                selectedHistoryInvoice.status === 'Paid' || selectedHistoryInvoice.status === 'Verified' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' :
-                                selectedHistoryInvoice.status === 'Awaiting Verification' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400' :
-                                'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                              }`}>
-                                {selectedHistoryInvoice.status === 'Paid' ? 'Verified & Funded' : selectedHistoryInvoice.status}
-                              </span>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => setSelectedHistoryInvoice(null)}
-                            className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                          >
-                            Close Preview
-                          </button>
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-
-              {/* Tab 4.5: Transparent Invoices */}
-              {activeMenuTab === 'invoices' && (
                 <InvoiceViewer 
                   ownedAnimals={ownedAnimals} 
                   userBalance={userBalance} 
@@ -1689,52 +1080,8 @@ export default function Dashboard({
                   orders={orders}
                   onUpdateOrder={onUpdateOrder}
                   currentUser={currentUser}
+                  companyBankDetails={companyBankDetails}
                 />
-              )}
-
-              {/* Tab 5: Health Records */}
-              {activeMenuTab === 'health-records' && (
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 max-w-2xl mx-auto space-y-6">
-                  <h3 className="font-display font-extrabold text-xl text-zinc-900 dark:text-white flex items-center">
-                    <Syringe className="h-6 w-6 text-emerald-600 mr-2" /> Complete Vaccination & Veterinary logs
-                  </h3>
-                  {currentSelectedAnimal ? (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-zinc-50 dark:bg-zinc-950 rounded-xl border text-xs space-y-2">
-                        <p className="font-bold text-sm">Animal profile: {currentSelectedAnimal.breed} ({currentSelectedAnimal.tagNumber})</p>
-                        <p className="text-zinc-500">Last routine health screening: <strong className="text-zinc-700 dark:text-zinc-300">{currentSelectedAnimal.lastVetCheck}</strong></p>
-                        <p className="text-zinc-500">Scheduled Checkup: <strong className="text-zinc-700 dark:text-zinc-300">28 July 2026</strong></p>
-                      </div>
-
-                      <div className="space-y-3 pt-2">
-                        <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">Administered Vaccines Timeline</p>
-                        <div className="relative border-l border-emerald-500/30 ml-3.5 pl-6 space-y-4 text-xs">
-                          <div className="relative">
-                            <span className="absolute -left-9 top-0.5 bg-emerald-500 h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px]">✓</span>
-                            <p className="font-bold text-zinc-800 dark:text-white">PPR Booster dose vaccine</p>
-                            <p className="text-[10px] text-zinc-400">Administered on 20 June 2026 • Verified batch_v4012</p>
-                          </div>
-                          <div className="relative">
-                            <span className="absolute -left-9 top-0.5 bg-emerald-500 h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px]">✓</span>
-                            <p className="font-bold text-zinc-800 dark:text-white">Foot & Mouth Disease (FMD) booster</p>
-                            <p className="text-[10px] text-zinc-400">Administered on 01 May 2026 • Verified batch_v3911</p>
-                          </div>
-                          <div className="relative">
-                            <span className="absolute -left-9 top-0.5 bg-emerald-500 h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px]">✓</span>
-                            <p className="font-bold text-zinc-800 dark:text-white">Deworming booster Q2</p>
-                            <p className="text-[10px] text-zinc-400">Routine physical deworming checkup verified</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t dark:border-zinc-800 text-center text-xs font-bold text-zinc-400">
-                        🛡️ Secured under CowPlugNG Chief Veterinarian Dr. Babatunde Jinadu
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-zinc-500">No active animal selected.</p>
-                  )}
-                </div>
               )}
 
               {/* Tab 6: Feeding Plans */}
@@ -1870,42 +1217,6 @@ export default function Dashboard({
                 </div>
               )}
 
-              {/* Tab 8: My Profile */}
-              {activeMenuTab === 'profile' && (
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 max-w-xl mx-auto space-y-6">
-                  <div className="flex items-center space-x-4 border-b pb-4 dark:border-zinc-800">
-                    <img src={currentUser.avatar} alt="User avatar" className="h-16 w-16 rounded-full border border-emerald-500 object-cover" />
-                    <div>
-                      <h3 className="font-display font-extrabold text-xl text-zinc-900 dark:text-white">{currentUser.fullName}</h3>
-                      <p className="text-xs text-zinc-400">KYC Status: <span className="text-emerald-600 font-bold">Level 2 BVN Verified</span></p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 text-xs font-mono">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl">
-                        <span className="text-zinc-400 block text-[9px]">Registered Email</span>
-                        <strong className="text-zinc-800 dark:text-zinc-200 block mt-1">{currentUser.email}</strong>
-                      </div>
-                      <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl">
-                        <span className="text-zinc-400 block text-[9px]">Phone Number</span>
-                        <strong className="text-zinc-800 dark:text-zinc-200 block mt-1">{currentUser.phone || '+234 803 000 0000'}</strong>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl">
-                        <span className="text-zinc-400 block text-[9px]">Security PIN Status</span>
-                        <strong className="text-emerald-600 block mt-1">✓ Active Set</strong>
-                      </div>
-                      <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl">
-                        <span className="text-zinc-400 block text-[9px]">Wallet Custody Pool</span>
-                        <strong className="text-zinc-800 dark:text-zinc-200 block mt-1">Naira Escrow Account</strong>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
             </div>
           )}
 
@@ -1928,9 +1239,6 @@ export default function Dashboard({
                     </p>
                   </div>
 
-                  {/* Grounded Local Weather Widget */}
-                  <WeatherWidget defaultLocation="Kaduna, Nigeria" ranchName="Kaduna Livestock Zone B" />
-
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
                       <span className="text-[10px] text-zinc-400 font-bold uppercase">Ranch Active Listings</span>
@@ -1943,7 +1251,7 @@ export default function Dashboard({
                       <span className="text-[9px] text-zinc-400">Veterinary approved</span>
                     </div>
                     <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                      <span className="text-[10px] text-zinc-400 font-bold uppercase">Pending Wallet Proceeds</span>
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase">Pending Proceeds</span>
                       <strong className="text-lg text-emerald-600 dark:text-emerald-400 font-mono block mt-1">₦{userBalance.toLocaleString()}</strong>
                       <span className="text-[9px] text-zinc-400">Ready for withdrawal</span>
                     </div>
@@ -2115,7 +1423,7 @@ export default function Dashboard({
               {activeMenuTab === 'sales' && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl space-y-4">
                   <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Ranch Sales ledger</h3>
-                  <p className="text-xs text-zinc-500">Complete summary of proceeds cataloged from marketplace listings.</p>
+                  <p className="text-xs text-zinc-500">Complete summary of proceeds cataloged from active listings.</p>
                   <div className="space-y-2">
                     <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl text-xs flex justify-between">
                       <div>
@@ -2128,55 +1436,11 @@ export default function Dashboard({
                 </div>
               )}
 
-              {/* Tab 5: Payments */}
+              {/* Tab 5: Payments (Removed as per Manual Workflow) */}
               {activeMenuTab === 'payments' && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl max-w-xl mx-auto space-y-4">
-                  <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Seller Wallet & Bank Payouts</h3>
-                  <p className="text-xs text-zinc-500">Secure withdrawal coordinates for verified herders.</p>
-                  <form onSubmit={handleWithdraw} className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 mb-1">Payout Amount (₦)</label>
-                        <input
-                          type="number"
-                          required
-                          value={withdrawAmount}
-                          onChange={(e) => setWithdrawAmount(e.target.value)}
-                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800 font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 mb-1">Bank Name</label>
-                        <input
-                          type="text"
-                          required
-                          value={bankName}
-                          onChange={(e) => setBankName(e.target.value)}
-                          className="w-full px-4 py-2 rounded-xl border text-xs dark:bg-zinc-950 dark:border-zinc-800"
-                        />
-                      </div>
-                    </div>
-                    <button type="submit" className="w-full py-2.5 bg-amber-600 text-white rounded-xl text-xs font-bold">
-                      Withdraw Proceeds
-                    </button>
-                  </form>
-                  {withdrawSuccess && (
-                    <p className="text-xs text-emerald-600 text-center font-bold">Payout request filed successfully!</p>
-                  )}
-                </div>
-              )}
-
-              {/* Tab 6: Profile */}
-              {activeMenuTab === 'profile' && (
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 max-w-xl mx-auto space-y-4">
-                  <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Herder partner credentials</h3>
-                  <div className="flex items-center space-x-3">
-                    <img src={currentUser.avatar} alt="Farm profile" className="h-12 w-12 rounded-full border border-amber-500 object-cover" />
-                    <div>
-                      <h4 className="font-bold text-sm">{currentUser.fullName}</h4>
-                      <p className="text-[10px] text-zinc-400">Cooperative ID: #COOP-KAD-941</p>
-                    </div>
-                  </div>
+                  <h3 className="font-bold text-sm text-zinc-900 dark:text-white">Account Payments & Treasury</h3>
+                  <p className="text-xs text-zinc-500">CowPlugNG now operates using manual payment verification only. Please use the "My Invoices" tab to settle your outstanding sourcing requests.</p>
                 </div>
               )}
 
@@ -2216,7 +1480,7 @@ export default function Dashboard({
                       <strong className="text-lg text-amber-500 block mt-1">{deliveryRequests.length} Scheduled</strong>
                     </div>
                     <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                      <span className="text-[10px] text-zinc-400 font-bold uppercase">Escrow deposits pool</span>
+                      <span className="text-[10px] text-zinc-400 font-bold uppercase">Deposits pool</span>
                       <strong className="text-lg text-emerald-600 font-mono block mt-1">₦{usersList.reduce((sum, u) => sum + u.balance, 0).toLocaleString()}</strong>
                     </div>
                   </div>
@@ -2400,7 +1664,7 @@ export default function Dashboard({
                     <div className="flex items-center justify-between pt-1">
                       <div>
                         <strong className="text-xs text-zinc-800 dark:text-zinc-200 block font-bold">Two-Factor Authentication (MFA)</strong>
-                        <span className="text-[10px] text-zinc-400 block">Require secure TOTP verification for wallet fund withdrawals.</span>
+                        <span className="text-[10px] text-zinc-400 block">Require secure TOTP verification for fund withdrawals.</span>
                       </div>
                       <button className="w-9 h-5 bg-emerald-600 rounded-full p-0.5 transition-colors duration-200">
                         <div className="bg-white w-4 h-4 rounded-full shadow-md transform translate-x-4" />

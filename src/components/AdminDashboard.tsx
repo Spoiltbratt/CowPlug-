@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Activity, Users, HeartPulse, Wallet, Wheat, Settings, BarChart3, 
+  Activity, Users, HeartPulse, Wheat, Settings, BarChart3, 
   FileText, ShieldCheck, Search, Filter, Plus, Edit3, Trash2, 
   UserMinus, UserPlus, AlertTriangle, ShieldAlert, Sparkles, CheckCircle2, 
   TrendingUp, Download, Eye, Calendar, MapPin, Tag, RefreshCw, AlertCircle, 
   PlusCircle, Info, ChevronRight, Check, X, Shield, Lock, FileSpreadsheet, FileDown, EyeOff,
   LogOut, Scale, Store, ShoppingBag, Truck, Receipt, Cpu, Syringe, Image as ImageIcon, Bell, LifeBuoy, UserCheck, Globe, History, MessageSquare, Sliders, Menu,
+  CreditCard,
   Copy, Archive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -13,6 +14,9 @@ import { ResponsiveContainer, LineChart, Line, BarChart, Bar, PieChart, Pie, Cel
 import { FarmerLivestock, User as UserType, AppNotification } from '../types';
 import { Invoice } from '../types_payments';
 import { PricePackageFormOverlay } from './PricePackageFormOverlay';
+import GmailIntegration from './GmailIntegration';
+import ContactsIntegration from './ContactsIntegration';
+import AdminOpportunities from './AdminOpportunities';
 
 interface AdminDashboardProps {
   currentUser: UserType;
@@ -300,9 +304,6 @@ export default function AdminDashboard({
   // New Sellers State
   const [sellersList, setSellersList] = useState<any[]>([]);
 
-  // New Marketplace listings State
-  const [marketplaceListings, setMarketplaceListings] = useState<any[]>([]);
-
   // New Meat Supply Orders State
   const [meatOrders, setMeatOrders] = useState<any[]>([]);
 
@@ -453,6 +454,14 @@ export default function AdminDashboard({
   const [livestockSearch, setLivestockSearch] = useState('');
   const [livestockTypeFilter, setLivestockTypeFilter] = useState('all');
   const [livestockStatusFilter, setLivestockStatusFilter] = useState('all');
+
+  // Manual Invoice Generation from Sourcing Request
+  const [isGeneratingInvoiceFromSrc, setIsGeneratingInvoiceFromSrc] = useState(false);
+  const [generatingInvoiceForInv, setGeneratingInvoiceForInv] = useState<Invoice | null>(null);
+  const [genInvPrice, setGenInvPrice] = useState('');
+  const [genInvAge, setGenInvAge] = useState('');
+  const [genInvReservedTag, setGenInvReservedTag] = useState('');
+  const [genInvMonthlyCost, setGenInvMonthlyCost] = useState('15000');
 
   // Interactive Selected / Editing Modal States
   const [selectedCustomer, setSelectedCustomer] = useState<UserType | null>(null);
@@ -900,7 +909,7 @@ export default function AdminDashboard({
     { id: 'log-2', timestamp: '2026-07-02 04:30:25', adminName: 'Mallam Yusuf (Farm Head)', role: 'Farm Manager', action: 'Feed Intake Log', details: 'Added 50 bags of Soybean Chaff into Central Warehouse B', status: 'success' },
     { id: 'log-3', timestamp: '2026-07-02 02:15:44', adminName: 'Dr. Amina Bello', role: 'Super Admin', action: 'Package Pricing Update', details: 'Modified Premium Fattening Package price to ₦20,750', status: 'warning' },
     { id: 'log-4', timestamp: '2026-07-01 18:40:00', adminName: 'John herder (Staff)', role: 'Staff', action: 'Vaccination Entry', details: 'Registered FMD Vaccine booster for animal tag CPG-CW-002', status: 'success' },
-    { id: 'log-5', timestamp: '2026-06-30 11:22:05', adminName: 'Dr. Amina Bello', role: 'Super Admin', action: 'Customer Suspended', details: 'Suspended account babajide@cole-estates.ng due to failed escrow payments', status: 'danger' }
+    { id: 'log-5', timestamp: '2026-06-30 11:22:05', adminName: 'Dr. Amina Bello', role: 'Super Admin', action: 'Customer Suspended', details: 'Suspended account babajide@cole-estates.ng due to failed payments', status: 'danger' }
   ]);
 
   // New livestock registration inputs (RFID tracking support)
@@ -1298,7 +1307,54 @@ export default function AdminDashboard({
     }, 2500);
   };
 
-  // Excel / PDF Export Simulation
+  // Handle submitting generated invoice for sourcing request
+  const handleSubmitGeneratedInvoice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!generatingInvoiceForInv) return;
+
+    const price = parseFloat(genInvPrice);
+    const monthlyCost = parseFloat(genInvMonthlyCost);
+    
+    if (!price) {
+      alert("Please enter a valid purchase price.");
+      return;
+    }
+
+    onUpdateInvoice(generatingInvoiceForInv.id, {
+      status: 'Awaiting Payment',
+      amount: price,
+      estimatedAge: genInvAge,
+      reservedTag: genInvReservedTag,
+      feedingPackage: {
+        ...generatingInvoiceForInv.feedingPackage,
+        monthlyCost: monthlyCost
+      },
+      auditLog: [
+        ...generatingInvoiceForInv.auditLog,
+        {
+          date: new Date().toISOString(),
+          status: 'Awaiting Payment',
+          actionBy: currentUser.fullName,
+          notes: `Invoice generated with purchase price ₦${price.toLocaleString()}. Reserved Tag: ${genInvReservedTag}`
+        }
+      ]
+    });
+
+    onDispatchNotification({
+      id: `notif-inv-gen-${Date.now()}`,
+      type: 'system',
+      title: '🧾 Invoice Generated',
+      message: `Admin has generated an invoice for your sourcing request. Please proceed to payment.`,
+      date: new Date().toISOString(),
+      read: false
+    });
+
+    alert("Invoice generated and sent to investor!");
+    logAdminAction("Invoice Generated", `Generated invoice ${generatingInvoiceForInv.invoiceNumber} for ${generatingInvoiceForInv.customerFullName}`, "success");
+    
+    setIsGeneratingInvoiceFromSrc(false);
+    setGeneratingInvoiceForInv(null);
+  };
   const handleSimulateExport = (format: 'PDF' | 'Excel', reportName: string) => {
     alert(`Generating CowPlug Agricultural ${format} Statement for: "${reportName}". Compilation successful! Download will start in the background.`);
     logAdminAction('Report Exported', `Downloaded ${reportName} in ${format} format.`);
@@ -1384,23 +1440,23 @@ export default function AdminDashboard({
         'https://images.unsplash.com/photo-1608539733291-a1dfc76b9789?auto=format&fit=crop&q=80&w=600'
       );
     } else {
-      if (confirm(`Approve payment of ₦${inv.amount.toLocaleString()} and fund user's wallet?`)) {
+      if (confirm(`Verify payment receipt of ₦${inv.amount.toLocaleString()}?`)) {
         onUpdateInvoice(inv.id, { 
-          status: 'Paid', 
+          status: 'Approved', 
           paymentDate: new Date().toISOString(), 
-          internalNotes: 'Wallet credit verified and approved by admin' 
+          internalNotes: 'Payment verified and approved by admin' 
         });
-        onUpdateUserBalance(inv.customerEmail, inv.amount);
+        // Wallet funding removed as per CowPlugNG manual workflow
         onDispatchNotification({
           id: `notif-payment-approve-${Date.now()}`,
           type: 'system',
-          title: '💸 Escrow Funding Verified',
-          message: `Your payment of ₦${inv.amount.toLocaleString()} has been verified. Wallet credited successfully.`,
+          title: '💸 Payment Verified',
+          message: `Your payment of ₦${inv.amount.toLocaleString()} has been verified. Status updated to Approved.`,
           date: new Date().toISOString(),
           read: false
         });
-        alert(`Escrow payment approved! Customer's wallet has been credited with ₦${inv.amount.toLocaleString()}`);
-        logAdminAction("Escrow Payment Verified", `Approved payment ₦${inv.amount} for ${inv.customerFullName}`, "success");
+        alert(`Payment approved! Invoice status updated to 'Approved'.`);
+        logAdminAction("Payment Verified", `Approved payment ₦${inv.amount} for ${inv.customerFullName}`, "success");
       }
     }
   };
@@ -1438,11 +1494,11 @@ export default function AdminDashboard({
     // Add to standard list
     onAddFarmerLivestock(newAnimalItem);
 
-    // 2. Update Invoice to Paid
+    // 2. Update Invoice to Onboarded
     onUpdateInvoice(inv.id, {
-      status: 'Paid',
-      paymentDate: new Date().toISOString(),
-      internalNotes: `Payment verified. Assigned CowPlugNG Tag: ${assignedTag}`
+      status: 'Livestock Onboarded',
+      paymentDate: inv.paymentDate || new Date().toISOString(),
+      internalNotes: `Payment verified. Assigned CowPlugNG Tag: ${assignedTag}. Livestock onboarded to investor dashboard.`
     });
 
     // 3. Update Order to Fulfillment / Paid / Tag Assigned
@@ -1641,21 +1697,12 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Group 3: MARKETPLACE & WAREHOUSE */}
+              {/* Group 3: WAREHOUSE & DIET */}
               <div>
                 <span className="px-3 text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">
                   Market & Diet
                 </span>
                 <div className="space-y-1">
-                  <button
-                    onClick={() => { setAdminTab('marketplace'); setMobileMenuOpen(false); }}
-                    className={`w-full flex items-center px-3 py-2 rounded-xl font-bold text-xs transition-all ${
-                      adminTab === 'marketplace' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
-                    }`}
-                  >
-                    <ShoppingBag className="h-4 w-4 shrink-0" />
-                    <span className="ml-3 truncate">Marketplace</span>
-                  </button>
                   <button
                     onClick={() => { setAdminTab('meat-orders'); setMobileMenuOpen(false); }}
                     className={`w-full flex items-center px-3 py-2 rounded-xl font-bold text-xs transition-all ${
@@ -1698,7 +1745,7 @@ export default function AdminDashboard({
                       adminTab === 'payments' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
                     }`}
                   >
-                    <Wallet className="h-4 w-4 shrink-0" />
+                    <CreditCard className="h-4 w-4 shrink-0" />
                     <span className="ml-3 truncate">Payments Ledger</span>
                   </button>
                   <button
@@ -1763,6 +1810,33 @@ export default function AdminDashboard({
                   >
                     <Globe className="h-4 w-4 shrink-0" />
                     <span className="ml-3 truncate">Website CMS</span>
+                  </button>
+                  <button
+                    onClick={() => { setAdminTab('jobs'); setMobileMenuOpen(false); }}
+                    className={`w-full flex items-center px-3 py-2 rounded-xl font-bold text-xs transition-all ${
+                      adminTab === 'jobs' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                    }`}
+                  >
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span className="ml-3 truncate">Career Jobs</span>
+                  </button>
+                  <button
+                    onClick={() => { setAdminTab('gmail'); setMobileMenuOpen(false); }}
+                    className={`w-full flex items-center px-3 py-2 rounded-xl font-bold text-xs transition-all ${
+                      adminTab === 'gmail' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                    }`}
+                  >
+                    <MessageSquare className="h-4 w-4 shrink-0" />
+                    <span className="ml-3 truncate">Company Inbox</span>
+                  </button>
+                  <button
+                    onClick={() => { setAdminTab('contacts'); setMobileMenuOpen(false); }}
+                    className={`w-full flex items-center px-3 py-2 rounded-xl font-bold text-xs transition-all ${
+                      adminTab === 'contacts' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                    }`}
+                  >
+                    <Users className="h-4 w-4 shrink-0" />
+                    <span className="ml-3 truncate">Contacts</span>
                   </button>
                   <button
                     onClick={() => { setAdminTab('settings'); setMobileMenuOpen(false); }}
@@ -1981,7 +2055,7 @@ export default function AdminDashboard({
               </div>
             </div>
 
-            {/* Group 3: MARKETPLACE & WAREHOUSE */}
+            {/* Group 3: WAREHOUSE & DIET */}
             <div>
               {!sidebarCollapsed && (
                 <span className="px-3 text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-2">
@@ -1989,16 +2063,6 @@ export default function AdminDashboard({
                 </span>
               )}
               <div className="space-y-1">
-                <button
-                  onClick={() => setAdminTab('marketplace')}
-                  className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
-                    adminTab === 'marketplace' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
-                  }`}
-                  title="Marketplace Listings"
-                >
-                  <ShoppingBag className="h-4 w-4 shrink-0" />
-                  {!sidebarCollapsed && <span className="ml-3 truncate">Marketplace</span>}
-                </button>
                 <button
                   onClick={() => setAdminTab('meat-orders')}
                   className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
@@ -2029,6 +2093,16 @@ export default function AdminDashboard({
                   <Wheat className="h-4 w-4 shrink-0" />
                   {!sidebarCollapsed && <span className="ml-3 truncate">Feed Inventory</span>}
                 </button>
+                <button
+                  onClick={() => setAdminTab('jobs')}
+                  className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
+                    adminTab === 'jobs' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                  title="Manage Career Opportunities"
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="ml-3 truncate">Career Jobs</span>}
+                </button>
               </div>
             </div>
 
@@ -2045,10 +2119,10 @@ export default function AdminDashboard({
                   className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
                     adminTab === 'payments' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
                   }`}
-                  title="Payments & Wallets"
+                  title="Payments"
                 >
-                  <Wallet className="h-4 w-4 shrink-0" />
-                  {!sidebarCollapsed && <span className="ml-3 truncate">Payments Ledger</span>}
+                  <CreditCard className="h-4 w-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="ml-3 truncate">Payments</span>}
                 </button>
                 <button
                   onClick={() => setAdminTab('invoices')}
@@ -2120,6 +2194,36 @@ export default function AdminDashboard({
                 >
                   <Globe className="h-4 w-4 shrink-0" />
                   {!sidebarCollapsed && <span className="ml-3 truncate">Website CMS</span>}
+                </button>
+                <button
+                  onClick={() => setAdminTab('jobs')}
+                  className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
+                    adminTab === 'jobs' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                  title="Manage Career Opportunities"
+                >
+                  <FileText className="h-4 w-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="ml-3 truncate">Career Jobs</span>}
+                </button>
+                <button
+                  onClick={() => setAdminTab('gmail')}
+                  className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
+                    adminTab === 'gmail' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                  title="Company Email Inbox"
+                >
+                  <MessageSquare className="h-4 w-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="ml-3 truncate">Company Inbox</span>}
+                </button>
+                <button
+                  onClick={() => setAdminTab('contacts')}
+                  className={`w-full flex items-center px-3 py-2 rounded-xl font-bold transition-all ${
+                    adminTab === 'contacts' ? 'bg-emerald-600 text-white shadow shadow-emerald-600/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-850'
+                  }`}
+                  title="Company Contacts"
+                >
+                  <Users className="h-4 w-4 shrink-0" />
+                  {!sidebarCollapsed && <span className="ml-3 truncate">Contacts</span>}
                 </button>
                 <button
                   onClick={() => setAdminTab('settings')}
@@ -2415,7 +2519,7 @@ export default function AdminDashboard({
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-md font-extrabold text-amber-500 font-mono">₦{pendingPaymentsSum.toLocaleString()}</span>
                   </div>
-                  <Wallet className="absolute top-3 right-3 h-4 w-4 text-amber-500/40 transition-opacity group-hover:opacity-0 md:group-hover:opacity-0" />
+                  <CreditCard className="absolute top-3 right-3 h-4 w-4 text-amber-500/40 transition-opacity group-hover:opacity-0 md:group-hover:opacity-0" />
                   <button 
                     onClick={() => {
                       if (setAdminTab) {
@@ -2462,11 +2566,11 @@ export default function AdminDashboard({
                   <button 
                     onClick={() => {
                       if (setAdminTab) {
-                        setAdminTab('marketplace');
+                        setAdminTab('meat-orders');
                       }
                     }}
                     className="absolute top-2 right-2 p-1.5 rounded-lg text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer z-10"
-                    title="View Marketplace Listings"
+                    title="View Catalog"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
@@ -2552,7 +2656,7 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
-                {/* Sourcing Escrow quick panel */}
+                {/* Sourcing Account quick panel */}
                 <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-sm">
                   <h3 className="font-display font-extrabold text-md text-zinc-900 dark:text-white">
                     Range Custody Summary
@@ -2682,7 +2786,7 @@ export default function AdminDashboard({
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-150 dark:border-zinc-800 pb-4">
                 <div>
                   <h3 className="font-display font-extrabold text-lg text-zinc-900 dark:text-white">Members & Customers Directory</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Manage, update details, and audit digital ledger wallets for all registered CowPlug accounts.</p>
+                  <p className="text-xs text-zinc-400 mt-1">Manage, update details, and audit digital ledger balances for all registered CowPlug accounts.</p>
                 </div>
                 <button 
                   onClick={() => setIsAddingCustomer(true)}
@@ -2743,7 +2847,7 @@ export default function AdminDashboard({
                         <th className="p-4">Phone / Location</th>
                         <th className="p-4">Account Role</th>
                         <th className="p-4">Registered Date</th>
-                        <th className="p-4">Est Balance</th>
+                        <th className="p-4">Phone Number</th>
                         <th className="p-4 text-right pr-6">Administrative Actions</th>
                       </tr>
                     </thead>
@@ -2781,7 +2885,7 @@ export default function AdminDashboard({
                                 2026-03-12
                               </td>
                               <td className="p-4 font-mono font-bold text-zinc-900 dark:text-white">
-                                ₦{user.balance?.toLocaleString() || '0'}
+                                {user.phone || 'N/A'}
                               </td>
                               <td className="p-4 text-right pr-6 space-x-1 whitespace-nowrap">
                                 <button 
@@ -2881,75 +2985,26 @@ export default function AdminDashboard({
 
                       <div className="space-y-6 flex-1">
                         
-                        {/* SECTION 1: FINANCE & PORTFOLIO */}
+                        {/* SECTION 1: LIVESTOCK PORTFOLIO */}
                         <div className="space-y-6">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-900 rounded-2xl">
-                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Wallet Balance</span>
-                              <strong className="font-mono text-emerald-600 dark:text-emerald-400 font-bold text-lg">₦{selectedCustomer.balance?.toLocaleString() || '0'}</strong>
-                              <span className="text-[9px] text-zinc-400 block mt-1">Available for Marketplace & Bids</span>
-                            </div>
-                            
-                            <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-900 rounded-2xl">
-                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Escrow Balance</span>
-                              <strong className="font-mono text-amber-600 dark:text-amber-400 font-bold text-lg">₦{(selectedCustomer.balance ? selectedCustomer.balance * 0.4 : 200000).toLocaleString(undefined, {maximumFractionDigits: 0})}</strong>
-                              <span className="text-[9px] text-zinc-400 block mt-1">Secured pending weight validation</span>
-                            </div>
 
-                            <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-900 rounded-2xl">
-                              <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Managed Livestock Nodes</span>
-                              <strong className="text-zinc-900 dark:text-white font-bold text-lg">
-                                {farmerLivestock.filter(an => an.ownersName && an.ownersName.toLowerCase().includes(selectedCustomer.fullName.toLowerCase())).length} Animals
-                              </strong>
-                              <span className="text-[9px] text-zinc-400 block mt-1">Active Pasture Boarding program</span>
-                            </div>
-                          </div>
-
-                          {/* Direct Ledger Balance Adjustment Tool */}
+                          {/* Sourcing Request Summary for Admin */}
                           <div className="p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-800 rounded-2xl space-y-3">
                             <div className="flex items-center gap-2">
-                              <Wallet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                              <h4 className="font-bold text-xs text-zinc-900 dark:text-white uppercase tracking-wider">Direct Ledger Balance Adjustment</h4>
+                              <FileText className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              <h4 className="font-bold text-xs text-zinc-900 dark:text-white uppercase tracking-wider">Member Sourcing Status</h4>
                             </div>
-                            <p className="text-[10px] text-zinc-400">Instantly credit or debit this member's secure wallet. This action bypasses external payment gateways and modifies the central ledger node directly.</p>
-                            <form 
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                const formData = new FormData(e.currentTarget);
-                                const amt = parseFloat(formData.get('adjustAmount') as string) || 0;
-                                const action = formData.get('adjustAction') as 'credit' | 'debit';
-                                if (amt <= 0) {
-                                  alert('Please enter a valid positive amount.');
-                                  return;
-                                }
-                                const change = action === 'credit' ? amt : -amt;
-                                
-                                setUsersList(prev => prev.map(u => {
-                                  if (u.id === selectedCustomer.id) {
-                                    return { ...u, balance: Math.max(0, u.balance + change) };
-                                  }
-                                  return u;
-                                }));
-                                setSelectedCustomer(prev => {
-                                  if (!prev) return null;
-                                  return { ...prev, balance: Math.max(0, prev.balance + change) };
-                                });
-
-                                logAdminAction('Ledger Adjusted', `${action === 'credit' ? 'Credited' : 'Debited'} ₦${amt.toLocaleString()} to ${selectedCustomer.fullName}'s wallet`, 'warning');
-                                alert(`Ledger Adjusted! Wallet updated by ₦${change.toLocaleString()}`);
-                                e.currentTarget.reset();
-                              }}
-                              className="flex gap-2 text-xs"
-                            >
-                              <select name="adjustAction" className="px-2 py-1.5 border rounded-xl dark:bg-zinc-900 dark:border-zinc-700 font-bold bg-white dark:bg-zinc-950">
-                                <option value="credit">Credit (+)</option>
-                                <option value="debit">Debit (-)</option>
-                              </select>
-                              <input type="number" name="adjustAmount" placeholder="Amount (₦)" className="flex-1 px-3 py-1.5 border rounded-xl dark:bg-zinc-900 dark:border-zinc-700 bg-white dark:bg-zinc-950" required />
-                              <button type="submit" className="px-4 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 rounded-xl font-bold transition-all shadow-sm">
-                                Adjust Ledger
-                              </button>
-                            </form>
+                            <p className="text-[10px] text-zinc-400">Total active sourcing requests and billing invoices assigned to this member.</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="p-3 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl">
+                                <span className="text-[9px] text-zinc-400 uppercase font-bold block">Open Requests</span>
+                                <strong className="text-zinc-900 dark:text-white">{invoices.filter(i => i.customerId === selectedCustomer.id && i.status === 'Awaiting Invoice').length}</strong>
+                              </div>
+                              <div className="p-3 bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl">
+                                <span className="text-[9px] text-zinc-400 uppercase font-bold block">Pending Payment</span>
+                                <strong className="text-amber-600">{invoices.filter(i => i.customerId === selectedCustomer.id && i.status === 'Awaiting Payment').length}</strong>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Livestock Assets Owned Sub-Table */}
@@ -3970,7 +4025,7 @@ export default function AdminDashboard({
                 </div>
 
                 <div className="bg-white dark:bg-zinc-900 p-4 border rounded-2xl">
-                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Pending Sourcing Escrow</span>
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider block">Pending Sourcing Funds</span>
                   <strong className="font-mono text-xl font-black text-amber-500 block mt-1">
                     ₦{paymentsList.filter(p => p.status === 'Pending').reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
                   </strong>
@@ -4856,78 +4911,7 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ==================================== */}
-          {/* TAB 15: MARKETPLACE */}
-          {/* ==================================== */}
-          {adminTab === 'marketplace' && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="border-b pb-4">
-                <h3 className="font-display font-extrabold text-lg text-zinc-900 dark:text-white">Marketplace Listing Moderation</h3>
-                <p className="text-xs text-zinc-400 mt-1">Approve, reject, feature, or mark sold individual livestock listings submitted by vetted pastoralists.</p>
-              </div>
-
-              {/* Listings Moderation Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {marketplaceListings.map(lst => (
-                  <div key={lst.id} className="bg-white dark:bg-zinc-900 p-5 rounded-3xl border border-zinc-200 dark:border-zinc-800 flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden">
-                    {lst.featured && (
-                      <span className="absolute top-3 right-3 bg-amber-400 text-zinc-950 font-black text-[8px] uppercase px-2 py-0.5 rounded">Featured</span>
-                    )}
-                    <div>
-                      <img src={lst.image} alt="listing" className="h-32 w-full object-cover rounded-xl" referrerPolicy="no-referrer" />
-                      <div className="mt-3">
-                        <span className="text-[9px] font-mono font-bold uppercase text-zinc-400">{lst.category} • {lst.ageMonths} mos • {lst.weightKg} kg</span>
-                        <h4 className="font-bold text-sm text-zinc-900 dark:text-white mt-1">{lst.title}</h4>
-                        <p className="text-[11px] text-zinc-400 font-mono mt-1">Seller: {lst.sellerName}</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t flex justify-between items-center">
-                      <span className="font-mono font-extrabold text-md text-emerald-600 dark:text-emerald-400">₦{lst.price.toLocaleString()}</span>
-                      <span className={`px-2 py-0.5 text-[9px] font-mono font-black uppercase rounded ${
-                        lst.status === 'Approved' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
-                      }`}>
-                        {lst.status}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      {lst.status === 'Pending' ? (
-                        <button 
-                          onClick={() => {
-                            setMarketplaceListings(marketplaceListings.map(m => m.id === lst.id ? { ...m, status: 'Approved' } : m));
-                            logAdminAction('Listing Approved', `Approved livestock marketplace listing "${lst.title}".`, 'success');
-                          }}
-                          className="py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg text-center"
-                        >
-                          Approve
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => {
-                            setMarketplaceListings(marketplaceListings.map(m => m.id === lst.id ? { ...m, status: 'Pending' } : m));
-                            logAdminAction('Listing Suspended', `Unapproved marketplace listing "${lst.title}".`, 'warning');
-                          }}
-                          className="py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg text-center"
-                        >
-                          Deactivate
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => {
-                          setMarketplaceListings(marketplaceListings.map(m => m.id === lst.id ? { ...m, featured: !m.featured } : m));
-                          logAdminAction('Listing Featured Toggled', `Toggled featured status for "${lst.title}".`, 'success');
-                        }}
-                        className="py-1.5 border hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-[10px] rounded-lg text-center"
-                      >
-                        {lst.featured ? 'Unfeature' : 'Feature'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* TAB 15: MARKETPLACE REMOVED */}
 
           {/* ==================================== */}
           {/* TAB 16: MEAT SUPPLY */}
@@ -5043,8 +5027,8 @@ export default function AdminDashboard({
             <div className="space-y-6 animate-fade-in">
               <div className="border-b pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <h3 className="font-display font-extrabold text-lg text-zinc-900 dark:text-white">Enterprise Billing & Escrow Audit Desk</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Audit, verify uploaded receipts, approve wallet funding, and track billing invoices.</p>
+                  <h3 className="font-display font-extrabold text-lg text-zinc-900 dark:text-white">Enterprise Billing & Account Audit Desk</h3>
+                  <p className="text-xs text-zinc-400 mt-1">Audit, verify uploaded receipts, approve balance funding, and track billing invoices.</p>
                 </div>
                 <div className="flex gap-2">
                   <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-3 py-1.5 rounded-xl text-xs font-mono font-black uppercase">
@@ -5053,15 +5037,84 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              {/* Sub-tabs: 1. Customer Escrow Invoices, 2. Simulated Operational Logs */}
+              {/* Sub-tabs: 1. Sourcing Requests, 2. Customer Invoices, 3. Simulated Operational Logs */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm space-y-6">
                 
-                {/* 1. CUSTOMER INVOICES (DYNAMIC PORTAL INTEGRATION) */}
+                {/* 1. SOURCING REQUESTS (AWAITING INVOICE) */}
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
                       <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                        <Wallet className="h-4 w-4 text-emerald-600" /> Active Customer Escrow Invoices
+                        <Plus className="h-4 w-4 text-emerald-600" /> Sourcing Requests Awaiting Invoice
+                      </h4>
+                      <p className="text-[11px] text-zinc-400">Requests from investors needing an official admin-generated invoice to proceed.</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-zinc-150 dark:border-zinc-800">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-zinc-50 dark:bg-zinc-900/60 text-[10px] font-extrabold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
+                          <th className="p-4 pl-6">ID</th>
+                          <th className="p-4">Investor</th>
+                          <th className="p-4">Animal Details</th>
+                          <th className="p-4">Budget/Package</th>
+                          <th className="p-4">Date</th>
+                          <th className="p-4 text-right pr-6">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-150 dark:divide-zinc-800 font-mono text-[11px]">
+                        {invoices.filter(i => i.status === 'Awaiting Invoice').length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-zinc-400 font-sans">
+                              <p className="text-xs">No pending sourcing requests.</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          invoices.filter(i => i.status === 'Awaiting Invoice').map(inv => (
+                            <tr key={inv.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-950/20 font-sans">
+                              <td className="p-4 pl-6 text-zinc-400 font-bold font-mono">#{inv.invoiceNumber}</td>
+                              <td className="p-4">
+                                <div className="font-bold text-zinc-800 dark:text-zinc-200">{inv.customerFullName}</div>
+                                <div className="text-[10px] text-zinc-400">{inv.customerId}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-bold">{inv.quantity} x {inv.animalType}</div>
+                                <div className="text-[10px] text-zinc-400">{inv.breed}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-bold text-emerald-600">₦{inv.amount.toLocaleString()}</div>
+                                <div className="text-[10px] text-zinc-400">{inv.feedingPackage.name}</div>
+                              </td>
+                              <td className="p-4 text-[10px] text-zinc-500">{new Date(inv.date).toLocaleDateString()}</td>
+                              <td className="p-4 text-right pr-6">
+                                <button
+                                  onClick={() => {
+                                    setGeneratingInvoiceForInv(inv);
+                                    setGenInvPrice(inv.amount.toString());
+                                    setGenInvAge(inv.animalType === 'Cow' ? '18 months' : '12 months');
+                                    setGenInvReservedTag(`CPG-${inv.animalType.substring(0,2).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`);
+                                    setIsGeneratingInvoiceFromSrc(true);
+                                  }}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold"
+                                >
+                                  Generate Invoice
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* 2. CUSTOMER INVOICES (DYNAMIC PORTAL INTEGRATION) */}
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <h4 className="font-bold text-sm text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-emerald-600" /> Active Customer Invoices
                       </h4>
                       <p className="text-[11px] text-zinc-400">Real-time ledger requests and uploaded manual payment receipts needing physical verification.</p>
                     </div>
@@ -5076,7 +5129,7 @@ export default function AdminDashboard({
                           <th className="p-4 font-mono">Amount (₦)</th>
                           <th className="p-4">Date</th>
                           <th className="p-4">Verification State</th>
-                          <th className="p-4 text-right pr-6">Escrow Operations</th>
+                          <th className="p-4 text-right pr-6">Operations</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-150 dark:divide-zinc-800 font-mono text-[11px]">
@@ -5104,8 +5157,9 @@ export default function AdminDashboard({
                               </td>
                               <td className="p-4">
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase font-mono ${
-                                  inv.status === 'Paid' || inv.status === 'Verified' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 
+                                  inv.status === 'Approved' || inv.status === 'Livestock Onboarded' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 
                                   inv.status === 'Awaiting Verification' ? 'bg-amber-50 text-amber-800 border border-amber-200 animate-pulse' :
+                                  inv.status === 'Awaiting Payment' ? 'bg-blue-50 text-blue-800 border border-blue-200' :
                                   inv.status === 'Rejected' ? 'bg-red-50 text-red-800 border border-red-200' :
                                   'bg-zinc-100 text-zinc-600 border border-zinc-200'
                                 }`}>
@@ -5129,13 +5183,13 @@ export default function AdminDashboard({
                                     Add Notes
                                   </button>
 
-                                  {(inv.status === 'Awaiting Verification' || inv.status === 'Pending Payment') && (
+                                  {(inv.status === 'Awaiting Verification' || inv.status === 'Awaiting Payment') && (
                                     <>
                                       <button
                                         onClick={() => handleOpenVerificationWorkflow(inv)}
                                         className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-colors"
                                       >
-                                        Verify & Fund
+                                        {inv.status === 'Awaiting Verification' ? 'Verify & Approved' : 'Direct Approval'}
                                       </button>
 
                                       <button
@@ -5153,7 +5207,7 @@ export default function AdminDashboard({
                                               date: new Date().toISOString(),
                                               read: false
                                             });
-                                            alert(`Escrow payment rejected.`);
+                                            alert(`Payment rejected.`);
                                             logAdminAction("Payment Rejected", `Rejected payment for ${inv.customerFullName}`, "danger");
                                           }
                                         }}
@@ -5899,20 +5953,16 @@ export default function AdminDashboard({
                         <X className="h-4 w-4 text-zinc-500" />
                       </button>
                     </div>
-
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
                         const formData = new FormData(e.currentTarget);
                         const name = formData.get('roleName') as string;
                         const description = formData.get('roleDescription') as string;
-
-                        // Check uniqueness
                         if (rolesConfig.some(r => r.name.toLowerCase() === name.toLowerCase())) {
                           alert(`A role named "${name}" already exists.`);
                           return;
                         }
-
                         const newRole: StaffRoleConfig = {
                           name,
                           description,
@@ -5925,7 +5975,6 @@ export default function AdminDashboard({
                             editCMS: false
                           }
                         };
-
                         setRolesConfig([...rolesConfig, newRole]);
                         setSelectedRoleForEdit(name);
                         setStaffSubTab('roles');
@@ -5945,7 +5994,6 @@ export default function AdminDashboard({
                           className="w-full px-3 py-2 border rounded-xl dark:bg-zinc-950 dark:border-zinc-800 font-bold"
                         />
                       </div>
-
                       <div>
                         <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Subsystem Operational Description</label>
                         <textarea
@@ -5956,7 +6004,6 @@ export default function AdminDashboard({
                           className="w-full px-3 py-2 border rounded-xl dark:bg-zinc-950 dark:border-zinc-800"
                         />
                       </div>
-
                       <div className="flex justify-end gap-3 pt-3 border-t dark:border-zinc-800">
                         <button
                           type="button"
@@ -5974,6 +6021,17 @@ export default function AdminDashboard({
                       </div>
                     </form>
                   </div>
+                </div>
+              )}
+
+              {/* TAB 8: CAREER JOBS MANAGEMENT */}
+              {adminTab === 'jobs' && (
+                <div className="space-y-6">
+                  <div className="border-b border-slate-200 dark:border-zinc-800 pb-4 mb-6">
+                    <h2 className="text-xl font-black text-zinc-950 dark:text-white">Career Opportunities Management</h2>
+                    <p className="text-xs text-zinc-500 mt-1">Post roles, review applications, and manage prospective custodians.</p>
+                  </div>
+                  <AdminOpportunities />
                 </div>
               )}
             </div>
@@ -6401,6 +6459,32 @@ export default function AdminDashboard({
           )}
 
           {/* ==================================== */}
+          {/* TAB: GMAIL INTEGRATION */}
+          {/* ==================================== */}
+          {adminTab === 'gmail' && (
+            <div className="space-y-6 animate-fade-in max-w-5xl">
+              <div className="border-b pb-4">
+                <h3 className="font-display font-extrabold text-lg text-zinc-900 dark:text-white">Company Inbox</h3>
+                <p className="text-xs text-zinc-400 mt-1">Manage company email communication directly from the dashboard.</p>
+              </div>
+              <GmailIntegration />
+            </div>
+          )}
+
+          {/* ==================================== */}
+          {/* TAB: CONTACTS INTEGRATION */}
+          {/* ==================================== */}
+          {adminTab === 'contacts' && (
+            <div className="space-y-6 animate-fade-in max-w-5xl">
+              <div className="border-b pb-4">
+                <h3 className="font-display font-extrabold text-lg text-zinc-900 dark:text-white">Company Contacts</h3>
+                <p className="text-xs text-zinc-400 mt-1">Manage and view company contacts from Google Workspace.</p>
+              </div>
+              <ContactsIntegration />
+            </div>
+          )}
+
+          {/* ==================================== */}
           {/* TAB 22: PLATFORM GOVERNANCE */}
           {/* ==================================== */}
           {adminTab === 'settings' && (
@@ -6444,7 +6528,7 @@ export default function AdminDashboard({
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Payment Escrow Settlement Limit</label>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Payment Settlement Limit</label>
                         <select className="w-full px-3 py-2 border rounded-xl dark:bg-zinc-950 dark:border-zinc-800 font-bold">
                           <option>T+2 Days (Standard Bank Auditing)</option>
                           <option>T+0 Instant (High Liquidity)</option>
@@ -6563,9 +6647,9 @@ export default function AdminDashboard({
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-zinc-950 dark:to-orange-950/20 p-4 rounded-2xl border border-amber-200/60 dark:border-orange-900/30 flex items-start gap-3 shadow-xs">
                 <span className="text-xl leading-none shrink-0 mt-0.5">⚠️</span>
                 <div className="text-xs">
-                  <h4 className="font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider mb-0.5">Package Visibility & Marketplace Rules</h4>
+                  <h4 className="font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider mb-0.5">Package Visibility & General Rules</h4>
                   <p className="text-zinc-600 dark:text-zinc-400">
-                    Only pricing packages with an <span className="font-bold text-emerald-600 dark:text-emerald-400">"Active"</span> status are visible and available for customers to purchase in the marketplace. Packages with <span className="font-semibold text-zinc-500">"Inactive"</span>, <span className="font-semibold text-zinc-500">"Draft"</span>, or <span className="font-semibold text-zinc-500">"Archived"</span> statuses are fully hidden from the public client interface; however, existing subscribers remain safely enrolled on them until manually migrated.
+                    Only pricing packages with an <span className="font-bold text-emerald-600 dark:text-emerald-400">"Active"</span> status are visible and available for customers to subscribe. Packages with <span className="font-semibold text-zinc-500">"Inactive"</span>, <span className="font-semibold text-zinc-500">"Draft"</span>, or <span className="font-semibold text-zinc-500">"Archived"</span> statuses are fully hidden from the public client interface; however, existing subscribers remain safely enrolled on them until manually migrated.
                   </p>
                 </div>
               </div>
@@ -7520,6 +7604,119 @@ export default function AdminDashboard({
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Generate Invoice from Sourcing Request Modal */}
+              {isGeneratingInvoiceFromSrc && generatingInvoiceForInv && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-zinc-950/40 backdrop-blur-sm animate-in fade-in duration-300">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+                  >
+                    <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50/50 dark:bg-zinc-950/20">
+                      <div>
+                        <h3 className="font-display font-black text-zinc-950 dark:text-white uppercase tracking-tight">Generate Final Invoice</h3>
+                        <p className="text-[11px] text-zinc-500">Sourcing ID: {generatingInvoiceForInv.invoiceNumber}</p>
+                      </div>
+                      <button onClick={() => setIsGeneratingInvoiceFromSrc(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors text-zinc-400">
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSubmitGeneratedInvoice} className="p-6 space-y-5 text-xs">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-600">
+                              <Users size={20} />
+                            </div>
+                            <div>
+                              <div className="text-[10px] font-bold text-zinc-400 uppercase">Investor Info</div>
+                              <div className="text-sm font-bold text-zinc-900 dark:text-white">{generatingInvoiceForInv.customerFullName}</div>
+                              <div className="text-[10px] text-zinc-500">ID: {generatingInvoiceForInv.customerId}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="col-span-2 grid grid-cols-3 gap-3">
+                          <div className="p-2 border rounded-xl text-center">
+                            <div className="text-[9px] font-bold text-zinc-400 uppercase">Type</div>
+                            <div className="text-xs font-bold">{generatingInvoiceForInv.animalType}</div>
+                          </div>
+                          <div className="p-2 border rounded-xl text-center">
+                            <div className="text-[9px] font-bold text-zinc-400 uppercase">Quantity</div>
+                            <div className="text-xs font-bold">{generatingInvoiceForInv.quantity}</div>
+                          </div>
+                          <div className="p-2 border rounded-xl text-center">
+                            <div className="text-[9px] font-bold text-zinc-400 uppercase">Breed</div>
+                            <div className="text-xs font-bold">{generatingInvoiceForInv.breed}</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Purchase Price (₦)</label>
+                          <input
+                            type="number"
+                            required
+                            value={genInvPrice}
+                            onChange={(e) => setGenInvPrice(e.target.value)}
+                            placeholder="e.g. 450000"
+                            className="w-full px-4 py-2.5 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs font-mono font-bold"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Estimated Age</label>
+                          <input
+                            type="text"
+                            required
+                            value={genInvAge}
+                            onChange={(e) => setGenInvAge(e.target.value)}
+                            placeholder="e.g. 18 months"
+                            className="w-full px-4 py-2.5 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs font-bold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Reserved Tag ID</label>
+                          <input
+                            type="text"
+                            required
+                            value={genInvReservedTag}
+                            onChange={(e) => setGenInvReservedTag(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs font-mono font-bold"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Management Cost (₦/mo)</label>
+                          <input
+                            type="number"
+                            required
+                            value={genInvMonthlyCost}
+                            onChange={(e) => setGenInvMonthlyCost(e.target.value)}
+                            className="w-full px-4 py-2.5 rounded-xl border dark:bg-zinc-950 dark:border-zinc-800 text-xs font-mono font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setIsGeneratingInvoiceFromSrc(false)}
+                          className="flex-1 py-3 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl text-xs font-bold transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all"
+                        >
+                          Dispatch Invoice
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
                 </div>
               )}
 

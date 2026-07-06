@@ -12,7 +12,7 @@ import {
   orderBy 
 } from 'firebase/firestore';
 import { db, auth, OperationType, handleFirestoreError } from '../firebase';
-import { User, UserInvestment, FarmerLivestock, AppNotification, MarketplaceAnimal } from '../types';
+import { User, UserInvestment, FarmerLivestock, AppNotification } from '../types';
 import { Invoice } from '../types_payments';
 import { Order } from '../components/AdminOrderManagementCenterModal';
 import { AdminNotification } from '../components/AdminNotificationCenterModal';
